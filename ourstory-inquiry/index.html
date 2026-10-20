@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="index,follow"><meta name="description" content="아워스토리 학교 교육 프로그램 문의 접수">
+<title>교육 프로그램 문의 | 아워스토리</title>
+<style>
+:root{--ink:#1F2233;--purple:#4F55D6;--light:#F2F3F7;--line:#E4E6EE;--muted:#70788B}
+*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:var(--light);color:var(--ink);font-family:Pretendard,"Noto Sans KR","Apple SD Gothic Neo",system-ui,sans-serif;line-height:1.55;-webkit-font-smoothing:antialiased}button,input,select,textarea{font:inherit}
+.top{height:68px;background:white;border-bottom:1px solid #eaeaf0;display:flex;align-items:center}.topin{width:min(100% - 40px,790px);margin:auto;display:flex;align-items:center;gap:13px}.brand{font-size:20px;font-weight:900;letter-spacing:-.07em}.topin .sub{font-size:12px;color:#858b9c;border-left:1px solid #dce0ea;padding-left:13px}
+main{width:min(100% - 36px,790px);margin:62px auto 84px}.eyebrow{color:var(--purple);font-size:12px;font-weight:800;letter-spacing:.11em}.intro h1{margin:9px 0 11px;line-height:1.35;font-size:clamp(28px,5vw,37px);letter-spacing:-.055em}.intro p{font-size:14px;line-height:1.8;color:var(--muted);margin:0 0 30px}
+.card{background:white;border:1px solid #e8e9ef;border-radius:18px;padding:37px 41px;box-shadow:0 8px 35px rgba(31,34,51,.045)}.section{display:flex;align-items:center;gap:11px;font-size:16px;font-weight:800;margin:2px 0 19px;letter-spacing:-.03em}.dot{display:block;height:8px;width:8px;background:var(--purple);border-radius:50%}
+.fields{display:grid;grid-template-columns:1fr 1fr;gap:17px 16px}.field{min-width:0}.wide{grid-column:1/-1}.field label{display:block;font-size:13px;font-weight:700;margin-bottom:7px}.req{color:#e16d6d}.field input,.field select,.field textarea{outline:none;border:1px solid var(--line);border-radius:10px;width:100%;background:#fff;height:45px;padding:10px 13px;color:var(--ink);font-size:14px;transition:border-color .18s,box-shadow .18s}.field input::placeholder,.field textarea::placeholder{color:#a5aab6}.field input:focus,.field select:focus,.field textarea:focus{border-color:var(--purple);box-shadow:0 0 0 3px #4f55d61d}.field textarea{height:108px;min-height:108px;resize:vertical}.section2{margin-top:34px;padding-top:29px;border-top:1px solid #eeeef3}.select-help{display:block;margin:5px 0 0;font-size:11px;color:var(--muted)}
+.consent{margin:26px 0 14px;background:#f7f7fb;border:1px solid #ebecf4;border-radius:10px;padding:16px 17px;font-size:12px}.checkline{display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:700}.checkline input{accent-color:var(--purple);height:17px;width:17px;flex:none}.consent details{margin:8px 0 0 26px;color:var(--muted)}.consent summary{cursor:pointer;text-decoration:underline;text-underline-offset:3px}.consent p{margin:7px 0 0;line-height:1.7}
+.submit{border:0;background:var(--purple);color:white;border-radius:11px;width:100%;height:53px;cursor:pointer;font-weight:800;font-size:15px}.submit:hover:not(:disabled){background:#4147bf}.submit:disabled{opacity:.55;cursor:not-allowed}
+#message{min-height:20px;margin:12px 0;color:#ba4653;font-size:13px}.success{padding:55px 10px;text-align:center}.success .checkmark{width:68px;height:68px;border-radius:50%;background:#eeeffd;color:var(--purple);font-size:39px;line-height:68px;margin:0 auto 22px}.success h2{font-size:26px;letter-spacing:-.045em;margin:0 0 10px}.success p{color:var(--muted);font-size:14px}.foot{color:#9b9eab;font-size:12px;text-align:center;margin-top:30px}.bot{position:absolute;left:-9999px;height:1px;overflow:hidden}
+@media(max-width:600px){.top{height:62px}main{margin:42px auto 60px}.intro p{font-size:13px}.card{padding:25px 20px;border-radius:15px}.fields{grid-template-columns:1fr;gap:16px}.section2{margin-top:29px;padding-top:25px}}
+</style></head><body>
+<header class="top"><div class="topin"><div class="brand">OURSTORY<span style="color:var(--purple)">.</span></div><span class="sub">교육 프로그램 문의</span></div></header>
+<main><div class="intro"><div class="eyebrow">EDUCATION INQUIRY</div><h1>교육 프로그램 문의</h1><p>학교 정보와 관심 프로그램을 남겨주시면 확인 후 연락드리겠습니다.<br>구체적인 교육 내용과 일정은 상담을 통해 조율할 수 있습니다.</p></div>
+<section class="card"><form id="inquiry">
+<div class="section"><i class="dot" aria-hidden="true"></i>학교 및 담당자 정보</div>
+<div class="fields">
+<div class="field"><label for="school">학교명 <span class="req">*</span></label><input id="school" name="schoolName" placeholder="예) OO고등학교" autocomplete="organization" maxlength="80" required></div>
+<div class="field"><label for="type">학교급</label><select id="type" name="schoolType"><option value="">선택해 주세요</option><option>중학교</option><option>일반계 고등학교</option><option>특성화고등학교</option><option>기타</option></select></div>
+<div class="field"><label for="person">담당자 성함 <span class="req">*</span></label><input id="person" name="contactName" placeholder="성함을 입력해 주세요" autocomplete="name" maxlength="50" required></div>
+<div class="field"><label for="role">담당 업무</label><input id="role" name="position" placeholder="예) 진로부장, 2학년부장" maxlength="80"></div>
+<div class="field"><label for="phone">연락처 <span class="req">*</span></label><input id="phone" name="phone" placeholder="010-0000-0000" inputmode="tel" autocomplete="tel" maxlength="35" required></div>
+<div class="field"><label for="email">이메일</label><input id="email" type="email" name="email" placeholder="example@school.kr" autocomplete="email" maxlength="120"></div>
+</div>
+<div class="section section2"><i class="dot" aria-hidden="true"></i>프로그램 문의</div>
+<div class="fields">
+<div class="field wide"><label for="program">관심 교육 프로그램 <span class="req">*</span></label><select id="program" name="program" required><option value="">프로그램을 선택해 주세요</option><option>AI 디지털 리터러시</option><option>생성형 AI 활용 교육</option><option>디지털 시민교육</option><option>진로탐색 / 진로캠프</option><option>취업역량 강화</option><option>중소기업 이해 교육</option><option>기타 / 아직 정하지 않음</option></select></div>
+<div class="field wide"><label for="inquiryText">문의 내용</label><textarea id="inquiryText" name="message" maxlength="1800" placeholder="교육 대상, 희망 시기 등 자유롭게 작성해 주세요."></textarea></div>
+</div>
+<div class="bot"><label>웹사이트 주소<input name="website" tabindex="-1" autocomplete="off"></label></div>
+<div class="consent"><label class="checkline"><input id="agree" type="checkbox" name="privacy" required><span>[필수] 개인정보 수집 및 이용에 동의합니다.</span></label><details><summary>개인정보 수집 및 이용 안내</summary><p>수집항목: 학교명, 담당자 성함, 연락처, 이메일(입력 시), 담당 업무, 문의 내용<br>이용목적: 교육 프로그램 문의 확인 및 상담 연락<br>보관: 상담 및 문의 처리에 필요한 기간 동안 보관하며 관계 법령에 따라 보존이 필요한 경우 해당 기간 적용<br>동의를 거부할 수 있으나 온라인 문의 접수는 제한됩니다.</p></details></div>
+<button class="submit" id="submit" type="submit">문의 접수하기 →</button><p id="message" role="alert" aria-live="polite"></p></form>
+<div class="success" id="success" hidden><div class="checkmark">✓</div><h2>문의가 접수되었습니다.</h2><p>남겨주신 내용을 확인한 뒤 연락드리겠습니다.<br>감사합니다.</p></div></section>
+<div class="foot">© OURSTORY. All rights reserved.</div></main>
+<script>
+const form=document.getElementById('inquiry'),btn=document.getElementById('submit'),msg=document.getElementById('message');
+form.addEventListener('submit',async e=>{e.preventDefault();msg.textContent='';btn.disabled=true;btn.textContent='접수 중입니다…';const data=Object.fromEntries(new FormData(form));data.privacy=form.privacy.checked;try{const ctrl=new AbortController();const timeout=setTimeout(()=>ctrl.abort(),12000);let res;try{res=await fetch('/api/inquiry',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(data),signal:ctrl.signal})}finally{clearTimeout(timeout)}const result=await res.json().catch(()=>({}));if(!res.ok||!result.ok)throw Error(result.message||'일시적인 오류가 발생했습니다.');form.hidden=true;document.getElementById('success').hidden=false;document.getElementById('success').scrollIntoView({behavior:'smooth',block:'center'})}catch(err){msg.textContent='접수에 실패했습니다. 잠시 후 다시 시도해 주세요.';btn.disabled=false;btn.textContent='문의 접수하기 →'}});
+</script></body></html>
