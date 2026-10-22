@@ -7,3 +7,4 @@ test('P1 controls: board heartbeat expiry, +1 minute, explicit result reveal',as
 test('upgrade migration chain preserves working server behaviours in isolated rollback schema',async()=>{await runAssertions(db,'access-delays.assert.sql',true);await runAssertions(db,'submission-recovery.assert.sql',true);await runAssertions(db,'presentation.assert.sql',true)});
 
 test('existing server constraints, code secrecy, takeover and duplicate submission regression',async()=>{await runAssertions(db,'company-codes.assert.sql')});
+test('short and long reasons pass without truncation; blank reasons fail; upgrade and fresh schema',async()=>{await runAssertions(db,'unrestricted-reasons.assert.sql');await runAssertions(db,'unrestricted-reasons.assert.sql',true)});

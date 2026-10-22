@@ -31,7 +31,7 @@ end $code$;
 revoke all on function idea_private.new_entry_code(text[]) from public,anon,authenticated;
 grant execute on function idea_private.new_entry_code(text[]) to service_role;
 create table idea_private.teams(id int primary key, name text not null, entry_code text not null unique default idea_private.new_entry_code() check(entry_code ~ '^[0-9]{4}$'), device_hash text unique, working boolean not null default false, submitted boolean not null default false, draft_version int not null default 0);
-create table idea_private.investments(id uuid primary key default gen_random_uuid(), sender int not null references idea_private.teams(id), recipient int not null references idea_private.teams(id), amount int not null check(amount>0 and amount%100=0), reason text not null check(char_length(reason) between 10 and 60), created_at timestamptz not null default clock_timestamp(),unique(sender,recipient),check(sender<>recipient));
+create table idea_private.investments(id uuid primary key default gen_random_uuid(), sender int not null references idea_private.teams(id), recipient int not null references idea_private.teams(id), amount int not null check(amount>0 and amount%100=0), reason text not null constraint investments_reason_required check(reason !~ '^[[:space:]]*$'), created_at timestamptz not null default clock_timestamp(),unique(sender,recipient),check(sender<>recipient));
 create table idea_private.admin_sessions(token_hash text primary key, expires timestamptz not null);
 create table idea_private.attempts(ip text primary key, count int not null default 0, since timestamptz not null default now());
 alter table idea_private.room enable row level security;
@@ -193,7 +193,7 @@ begin
    for v in select value from jsonb_array_elements(p_data->'items') loop
     if coalesce(v->>'amount','') !~ '^\d+$' or coalesce(v->>'to','') !~ '^\d+$' then return jsonb_build_object('error','금액은 100만 원 단위의 숫자로 입력해 주세요.');end if;
     n:=(v->>'to')::int;amt:=(v->>'amount')::int;
-    if n=t.id or n=any(ids) or not exists(select 1 from idea_private.teams where id=n) or amt<=0 or amt%100<>0 or char_length(btrim(coalesce(v->>'reason',''))) not between 10 and 60 then return jsonb_build_object('error','자기 회사 투자, 중복 대상, 금액 또는 투자 이유를 확인해 주세요.');end if;
+    if n=t.id or n=any(ids) or not exists(select 1 from idea_private.teams where id=n) or amt<=0 or amt%100<>0 or coalesce(v->>'reason','') ~ '^[[:space:]]*$' then return jsonb_build_object('error','자기 회사 투자, 중복 대상, 금액 또는 투자 이유를 확인해 주세요.');end if;
     ids:=array_append(ids,n);total:=total+amt;
    end loop;
    if total<>r.budget then return jsonb_build_object('error','투자금 전액을 배분해 주세요.');end if;

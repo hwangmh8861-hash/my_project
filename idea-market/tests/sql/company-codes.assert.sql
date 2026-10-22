@@ -81,7 +81,7 @@ begin
  if result->>'code' is distinct from 'UNAUTHORIZED' then raise exception 'student reissued code';end if;
  -- All investment validation remains on the server.
  perform idea_codes_test.rpc('cancel',a,'{"company":1}');
- for config in select value from jsonb_array_elements('[{"to":2,"amount":4900,"reason":"실제로 활용 가능한 좋은 아이디어입니다."},{"to":2,"amount":4950,"reason":"실제로 활용 가능한 좋은 아이디어입니다."},{"to":2,"amount":5000,"reason":"짧음"},{"to":99,"amount":5000,"reason":"실제로 활용 가능한 좋은 아이디어입니다."}]'::jsonb) loop
+ for config in select value from jsonb_array_elements('[{"to":2,"amount":4900,"reason":"실제로 활용 가능한 좋은 아이디어입니다."},{"to":2,"amount":4950,"reason":"실제로 활용 가능한 좋은 아이디어입니다."},{"to":2,"amount":5000,"reason":"   "},{"to":99,"amount":5000,"reason":"실제로 활용 가능한 좋은 아이디어입니다."}]'::jsonb) loop
   result:=idea_codes_test.rpc('submit',d1,jsonb_build_object('epoch',ep,'confirmed',true,'items',jsonb_build_array(config)));
   if not result ? 'error' then raise exception 'investment validation bypass: %',config->>'amount';end if;
  end loop;
