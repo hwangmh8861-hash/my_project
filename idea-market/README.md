@@ -1,4 +1,4 @@
-# 아이디어 거래소
+# 투자 시뮬레이터
 
 고등학생 창업 캠프용 투자 시뮬레이션입니다. Vite, Supabase Edge Function/Postgres/Realtime, Vercel을 사용하며 한 인스턴스에서 한 수업을 운영합니다.
 
