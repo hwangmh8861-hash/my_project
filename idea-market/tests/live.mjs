@@ -10,7 +10,8 @@ setTimeout(()=>{console.error('Live test exceeded 90 seconds');process.exit(1)},
 import {createClient} from '@supabase/supabase-js';
 import {SUPABASE_URL,SUPABASE_KEY} from '../src/config.js';
 import {randomBytes} from 'node:crypto';
-const pin=process.env.TEST_PIN||JSON.parse(fs.readFileSync(new URL('../.runtime/session.json',import.meta.url))).pin;if(!pin)throw Error('TEST_PIN required');
+if(process.env.TEST_ALLOW_DESTRUCTIVE!=='yes')throw Error('Run only on a dedicated empty test classroom with TEST_ALLOW_DESTRUCTIVE=yes');
+const pin=process.env.TEST_PIN;if(!pin)throw Error('TEST_PIN required');
 const device=()=>randomBytes(32).toString('hex');
 async function request(action,token='',data={}){const r=await fetch(SUPABASE_URL+'/functions/v1/idea-market',{method:'POST',headers:{'Content-Type':'application/json',apikey:SUPABASE_KEY},body:JSON.stringify({action,token,data}),signal:AbortSignal.timeout(15000)});return r.json()}
 async function ok(action,token='',data={}){const r=await request(action,token,data);assert(!r.error,`${action}: ${r.error}`);return r}
