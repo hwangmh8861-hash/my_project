@@ -28,3 +28,11 @@
 - 동일하게 분리된 `idea_codes_upgrade_test`에서 기존 연결과 투자 내역을 가진 구 스키마에 추가 변경을 적용하여 데이터 보존과 코드 발급 확인 후 롤백.
 - 자기 회사 투자 금지·100만 원 단위·전액 배분·투자 이유·조원 확인·중복 제출 차단 검증 유지.
 - 운영 수업에 잘못된 코드나 기기 교체 입력을 보내는 테스트는 수행하지 않음.
+
+## Instructor stage layout
+- Only the instructor frontend and CSS changed; no database, RPC or student/board protocol changes.
+- Fixed status strip: status, timer, submitted count, one stage action.
+- Four accessible tabs; automatic selection only on status/epoch change; manual selection and unsaved settings survive polling.
+- Company actions in a more dialog. Closing removes open dialogs and the cancellation control; click guard also rejects stale cancellation controls.
+- Reopening retained in reflection. Admin QR/address preview removed.
+- `npm test`: 10 tests pass, including state transitions, tab persistence, dirty settings and stale cancellation protection. `npm run build`: pass.
