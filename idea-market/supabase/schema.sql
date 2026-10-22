@@ -58,12 +58,15 @@ alter table idea_private.room add column entry_limit_version int not null defaul
 grant all on idea_private.login_attempts,idea_private.login_failures to service_role;
 
 alter table idea_private.teams add column returned_items jsonb not null default '[]'::jsonb;
+alter table idea_private.room add column board_seen_at timestamptz;
+alter table idea_private.room add column revealed_at timestamptz;
+alter table idea_private.room add column reveal_version int not null default 0;
 create function public.idea_market_rpc(p_action text,p_token text default '',p_data jsonb default '{}'::jsonb,p_ip text default '') returns jsonb language plpgsql security invoker set search_path='' as $$
 declare r idea_private.room%rowtype; t idea_private.teams%rowtype; v jsonb; n int; amt int; total bigint:=0; ids int[]:='{}'; admin boolean:=false; board boolean:=false; changed boolean:=false; tok text; count_attempt int; recent timestamptz; out_json jsonb; mine jsonb; list jsonb; entries jsonb; names jsonb; code_state idea_private.code_attempts%rowtype; failure_count int; retry_at timestamptz; old_codes text[]; login_state idea_private.login_attempts%rowtype; delay_seconds int; stamp timestamptz;
 begin
  select * into r from idea_private.room where id=1 for update;
  if not found then return jsonb_build_object('error','수업이 준비되지 않았습니다.');end if;
- if r.status='open' and r.deadline is not null and clock_timestamp()>=r.deadline then update idea_private.room set status='closed',display='results' where id=1 returning * into r;changed:=true;end if;
+ if r.status='open' and r.deadline is not null and clock_timestamp()>=r.deadline then update idea_private.room set status='closed',display='awaiting' where id=1 returning * into r;changed:=true;end if;
  if p_action='login' then
   -- p_ip is retained only for RPC signature compatibility. It never identifies a device.
   if p_token !~ '^[0-9a-f]{64}$' then return jsonb_build_object('error','로그인 화면을 새로고침해 주세요.','code','DEVICE_REQUIRED');end if;
@@ -90,7 +93,7 @@ begin
  end if;
  select exists(select 1 from idea_private.admin_sessions where token_hash=p_token and expires>now()) into admin;
  board:=p_token=encode(extensions.digest(r.board_key,'sha256'),'hex');
- if p_action in ('admin','settings','start','close','display','cancel','release','reset','pin','logout','reissue','clear_entry_limits') and not admin then return jsonb_build_object('error','강사 로그인이 필요합니다.','code','UNAUTHORIZED');end if;
+ if p_action in ('admin','settings','start','close','display','cancel','release','reset','pin','logout','reissue','clear_entry_limits','extend','reveal') and not admin then return jsonb_build_object('error','강사 로그인이 필요합니다.','code','UNAUTHORIZED');end if;
  if board and p_action<>'board' then return jsonb_build_object('error','현황판은 보기 전용입니다.');end if;
  if p_action='board' and not (board or admin) then return jsonb_build_object('error','강사 화면에서 현황판을 열어 주세요.','code','UNAUTHORIZED');end if;
  if p_action in ('claim','working','submit') and (length(p_token)<>64 or (p_data->>'epoch') is distinct from r.epoch::text) then return jsonb_build_object('error','수업이 초기화되었습니다. 다시 접속해 주세요.','code','RESET');end if;
@@ -105,12 +108,19 @@ begin
   update idea_private.room set budget=amt,timer_minutes=case when status='ready' then (p_data->>'minutes')::int else timer_minutes end where id=1 returning * into r;changed:=true;
  elsif p_action='start' then
   if r.status='open' then return jsonb_build_object('error','이미 투자가 진행 중입니다.');end if;
-  update idea_private.room set status='open',display='live',deadline=case when timer_minutes>0 then clock_timestamp()+timer_minutes*interval '1 minute' else null end where id=1 returning * into r;changed:=true;
+  update idea_private.room set status='open',display='live',revealed_at=null,deadline=case when timer_minutes>0 then clock_timestamp()+timer_minutes*interval '1 minute' else null end where id=1 returning * into r;changed:=true;
  elsif p_action='close' then
-  update idea_private.room set status='closed',display='results' where id=1 returning * into r;changed:=true;
+  update idea_private.room set status='closed',display='awaiting' where id=1 returning * into r;changed:=true;
+ elsif p_action='extend' then
+  if r.status<>'open' or r.deadline is null then return jsonb_build_object('error','타이머로 투자 진행 중일 때만 시간을 늘릴 수 있습니다.');end if;
+  update idea_private.room set deadline=deadline+interval '1 minute' where id=1 returning * into r;changed:=true;
+ elsif p_action='reveal' then
+  if r.status<>'closed' then return jsonb_build_object('error','마감 후 결과를 공개할 수 있습니다.');end if;
+  update idea_private.room set display='results',revealed_at=clock_timestamp(),reveal_version=reveal_version+1 where id=1 returning * into r;changed:=true;
  elsif p_action='display' then
   if p_data->>'mode' not in ('qr','live','results','reasons') then return jsonb_build_object('error','잘못된 화면 설정입니다.');end if;
   if p_data->>'mode' in ('results','reasons') and r.status<>'closed' then return jsonb_build_object('error','투자 마감 후 사용할 수 있습니다.');end if;
+  if p_data->>'mode'='results' and r.revealed_at is null then return jsonb_build_object('error','결과 공개 버튼을 눌러 주세요.');end if;
   update idea_private.room set display=p_data->>'mode',focus=coalesce((p_data->>'focus')::int,focus) where id=1 returning * into r;changed:=true;
  elsif p_action='cancel' then
   n:=(p_data->>'company')::int;
@@ -129,7 +139,7 @@ begin
   delete from idea_private.investments;
   if coalesce((p_data->>'keep')::boolean,true) then update idea_private.teams set entry_code=idea_private.new_entry_code(old_codes),device_hash=null,working=false,submitted=false,returned_items='[]'::jsonb,draft_version=draft_version+1;
   else delete from idea_private.teams;insert into idea_private.teams(id,name,entry_code) select i,i||'조 회사',idea_private.new_entry_code(old_codes) from generate_series(1,n) i;end if;
-  update idea_private.room set status='ready',epoch=gen_random_uuid(),deadline=null,display='qr',focus=1,budget=case when (p_data->>'keep')::boolean then budget else 5000 end,timer_minutes=case when (p_data->>'keep')::boolean then timer_minutes else 0 end where id=1 returning * into r;changed:=true;
+  update idea_private.room set status='ready',epoch=gen_random_uuid(),deadline=null,revealed_at=null,display='qr',focus=1,budget=case when (p_data->>'keep')::boolean then budget else 5000 end,timer_minutes=case when (p_data->>'keep')::boolean then timer_minutes else 0 end where id=1 returning * into r;changed:=true;
  elsif p_action='pin' then
   if coalesce(p_data->>'pin','') !~ '^\d{4}$' then return jsonb_build_object('error','비밀번호는 숫자 4자리입니다.');end if;
   update idea_private.room set pin_hash=extensions.crypt(p_data->>'pin',extensions.gen_salt('bf')) where id=1;
@@ -192,14 +202,15 @@ begin
   end if;
  elsif p_action not in ('student','board','admin','tick') then return jsonb_build_object('error','지원하지 않는 요청입니다.');
  end if;
+ if p_action='board' then update idea_private.room set board_seen_at=clock_timestamp() where id=1 returning * into r;end if;
  if changed then update public.idea_market_signal set revision=revision+1 where id=1;end if;
  out_json:=jsonb_build_object('status',r.status,'budget',r.budget,'epoch',r.epoch,'deadline',r.deadline,'minutes',r.timer_minutes,'display',r.display,'focus',r.focus,'now',clock_timestamp(),'entryLimitVersion',r.entry_limit_version,'revision',(select revision from public.idea_market_signal where id=1));
  if p_action='tick' then return jsonb_build_object('ok',true);end if;
  if (admin and p_action<>'student') or board then
   select coalesce(jsonb_agg(jsonb_build_object('id',q.id,'name',q.name,'connected',q.device_hash is not null,'working',q.working,'submitted',q.submitted,'total',coalesce((select sum(amount) from idea_private.investments where recipient=q.id),0)) order by q.id),'[]'::jsonb) into list from idea_private.teams q;
   select coalesce(jsonb_agg(to_jsonb(i) order by created_at desc,id),'[]'::jsonb) into entries from idea_private.investments i;
-  out_json:=out_json||jsonb_build_object('teams',list,'investments',entries);
-  if admin and p_action<>'board' then out_json:=out_json||jsonb_build_object('entryLimited',(select count(*)>100 from idea_private.code_failures where failed_at>clock_timestamp()-interval '15 minutes') or exists(select 1 from idea_private.code_attempts where blocked_until>clock_timestamp()),'boardKey',r.board_key,'entryCodes',(select coalesce(jsonb_agg(jsonb_build_object('id',id,'entryCode',entry_code) order by id),'[]'::jsonb) from idea_private.teams));end if;
+  out_json:=out_json||jsonb_build_object('teams',list,'investments',entries,'revealedAt',r.revealed_at,'revealVersion',r.reveal_version);
+  if admin and p_action<>'board' then out_json:=out_json||jsonb_build_object('boardConnected',coalesce(r.board_seen_at>clock_timestamp()-interval '45 seconds',false),'entryLimited',(select count(*)>100 from idea_private.code_failures where failed_at>clock_timestamp()-interval '15 minutes') or exists(select 1 from idea_private.code_attempts where blocked_until>clock_timestamp()),'boardKey',r.board_key,'entryCodes',(select coalesce(jsonb_agg(jsonb_build_object('id',id,'entryCode',entry_code) order by id),'[]'::jsonb) from idea_private.teams));end if;
  else
   select coalesce(jsonb_agg(jsonb_build_object('id',q.id,'name',q.name,'taken',q.device_hash is not null) order by q.id),'[]'::jsonb) into list from idea_private.teams q where exists(select 1 from idea_private.teams me where me.device_hash=p_token);
   select jsonb_build_object('id',id,'name',name,'submitted',submitted,'working',working,'draftVersion',draft_version,'items',case when submitted then (select coalesce(jsonb_agg(jsonb_build_object('to',recipient,'amount',amount,'reason',reason) order by recipient),'[]'::jsonb) from idea_private.investments where sender=idea_private.teams.id) else returned_items end) into mine from idea_private.teams where device_hash=p_token;
