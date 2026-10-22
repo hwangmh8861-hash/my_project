@@ -57,6 +57,7 @@ alter table idea_private.code_attempts add column next_at timestamptz;
 alter table idea_private.room add column entry_limit_version int not null default 0;
 grant all on idea_private.login_attempts,idea_private.login_failures to service_role;
 
+alter table idea_private.teams add column returned_items jsonb not null default '[]'::jsonb;
 create function public.idea_market_rpc(p_action text,p_token text default '',p_data jsonb default '{}'::jsonb,p_ip text default '') returns jsonb language plpgsql security invoker set search_path='' as $$
 declare r idea_private.room%rowtype; t idea_private.teams%rowtype; v jsonb; n int; amt int; total bigint:=0; ids int[]:='{}'; admin boolean:=false; board boolean:=false; changed boolean:=false; tok text; count_attempt int; recent timestamptz; out_json jsonb; mine jsonb; list jsonb; entries jsonb; names jsonb; code_state idea_private.code_attempts%rowtype; failure_count int; retry_at timestamptz; old_codes text[]; login_state idea_private.login_attempts%rowtype; delay_seconds int; stamp timestamptz;
 begin
@@ -112,16 +113,22 @@ begin
   if p_data->>'mode' in ('results','reasons') and r.status<>'closed' then return jsonb_build_object('error','투자 마감 후 사용할 수 있습니다.');end if;
   update idea_private.room set display=p_data->>'mode',focus=coalesce((p_data->>'focus')::int,focus) where id=1 returning * into r;changed:=true;
  elsif p_action='cancel' then
-  n:=(p_data->>'company')::int;delete from idea_private.investments where sender=n;update idea_private.teams set submitted=false,working=false,draft_version=draft_version+1 where id=n;changed:=true;
+  n:=(p_data->>'company')::int;
+  if r.status='closed' then return jsonb_build_object('error','투자를 다시 연 뒤 제출을 취소해 주세요.');end if;
+  select * into t from idea_private.teams where id=n;
+  if not found or not t.submitted then return jsonb_build_object('error','제출된 회사만 취소할 수 있습니다.');end if;
+  update idea_private.teams set returned_items=(select coalesce(jsonb_agg(jsonb_build_object('to',recipient,'amount',amount,'reason',reason) order by recipient),'[]'::jsonb) from idea_private.investments where sender=n),submitted=false,working=false,draft_version=draft_version+1 where id=n;
+  delete from idea_private.investments where sender=n;changed:=true;
  elsif p_action='release' then
   update idea_private.teams set device_hash=null,working=false,draft_version=draft_version+1 where id=(p_data->>'company')::int;changed:=true;
  elsif p_action='reset' then
   if (p_data->>'confirm') is distinct from 'RESET' then return jsonb_build_object('error','초기화 확인이 필요합니다.');end if;
+  select count(*) into n from idea_private.teams;
   select coalesce(array_agg(code),'{}'::text[]) into old_codes from idea_private.entry_code_history;
   delete from idea_private.entry_code_history;
   delete from idea_private.investments;
-  if coalesce((p_data->>'keep')::boolean,true) then update idea_private.teams set entry_code=idea_private.new_entry_code(old_codes),device_hash=null,working=false,submitted=false,draft_version=draft_version+1;
-  else delete from idea_private.teams;insert into idea_private.teams(id,name,entry_code) select i,i||'조 회사',idea_private.new_entry_code(old_codes) from generate_series(1,7) i;end if;
+  if coalesce((p_data->>'keep')::boolean,true) then update idea_private.teams set entry_code=idea_private.new_entry_code(old_codes),device_hash=null,working=false,submitted=false,returned_items='[]'::jsonb,draft_version=draft_version+1;
+  else delete from idea_private.teams;insert into idea_private.teams(id,name,entry_code) select i,i||'조 회사',idea_private.new_entry_code(old_codes) from generate_series(1,n) i;end if;
   update idea_private.room set status='ready',epoch=gen_random_uuid(),deadline=null,display='qr',focus=1,budget=case when (p_data->>'keep')::boolean then budget else 5000 end,timer_minutes=case when (p_data->>'keep')::boolean then timer_minutes else 0 end where id=1 returning * into r;changed:=true;
  elsif p_action='pin' then
   if coalesce(p_data->>'pin','') !~ '^\d{4}$' then return jsonb_build_object('error','비밀번호는 숫자 4자리입니다.');end if;
@@ -181,7 +188,7 @@ begin
    end loop;
    if total<>r.budget then return jsonb_build_object('error','투자금 전액을 배분해 주세요.');end if;
    insert into idea_private.investments(sender,recipient,amount,reason) select t.id,(x->>'to')::int,(x->>'amount')::int,btrim(x->>'reason') from jsonb_array_elements(p_data->'items') x;
-   update idea_private.teams set submitted=true,working=false where id=t.id;changed:=true;
+   update idea_private.teams set submitted=true,working=false,returned_items='[]'::jsonb where id=t.id;changed:=true;
   end if;
  elsif p_action not in ('student','board','admin','tick') then return jsonb_build_object('error','지원하지 않는 요청입니다.');
  end if;
@@ -195,7 +202,7 @@ begin
   if admin and p_action<>'board' then out_json:=out_json||jsonb_build_object('entryLimited',(select count(*)>100 from idea_private.code_failures where failed_at>clock_timestamp()-interval '15 minutes') or exists(select 1 from idea_private.code_attempts where blocked_until>clock_timestamp()),'boardKey',r.board_key,'entryCodes',(select coalesce(jsonb_agg(jsonb_build_object('id',id,'entryCode',entry_code) order by id),'[]'::jsonb) from idea_private.teams));end if;
  else
   select coalesce(jsonb_agg(jsonb_build_object('id',q.id,'name',q.name,'taken',q.device_hash is not null) order by q.id),'[]'::jsonb) into list from idea_private.teams q where exists(select 1 from idea_private.teams me where me.device_hash=p_token);
-  select jsonb_build_object('id',id,'name',name,'submitted',submitted,'working',working,'draftVersion',draft_version) into mine from idea_private.teams where device_hash=p_token;
+  select jsonb_build_object('id',id,'name',name,'submitted',submitted,'working',working,'draftVersion',draft_version,'items',case when submitted then (select coalesce(jsonb_agg(jsonb_build_object('to',recipient,'amount',amount,'reason',reason) order by recipient),'[]'::jsonb) from idea_private.investments where sender=idea_private.teams.id) else returned_items end) into mine from idea_private.teams where device_hash=p_token;
   out_json:=out_json||jsonb_build_object('teams',list,'mine',mine);
  end if;
  return out_json;
