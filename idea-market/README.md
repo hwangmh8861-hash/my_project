@@ -30,7 +30,7 @@ TRUNCATE idea_private.login_attempts, idea_private.login_failures, idea_private.
 
 ## 데이터 보호와 연결
 
-서버에서 자기 회사 투자 금지, 100만 원 단위, 전액 배분, 이유 10~60자, 조원 합의, 중복 제출을 검사합니다. 학생 응답은 해당 기기가 소유한 회사의 제출/복원 내역만 포함합니다. 다른 회사의 결과와 모든 입장 코드는 제외합니다. 코드는 비공개 idea_private 스키마에 평문 저장하고 강사에게만 반환합니다. 공개 Realtime 테이블에는 변경 신호만 기록합니다.
+서버에서 자기 회사 투자 금지, 100만 원 단위, 전액 배분, 빈칸이 아닌 투자 이유, 조원 합의, 중복 제출을 검사합니다. 학생 응답은 해당 기기가 소유한 회사의 제출/복원 내역만 포함합니다. 다른 회사의 결과와 모든 입장 코드는 제외합니다. 코드는 비공개 idea_private 스키마에 평문 저장하고 강사에게만 반환합니다. 공개 Realtime 테이블에는 변경 신호만 기록합니다.
 
 Realtime과 별도로 진행 중 3초, 나머지 상태 10초 간격으로 스냅샷을 가져옵니다. WebSocket이 차단돼도 API가 연결되면 계속 갱신합니다. API까지 끊기면 학생 화면에 연결 중 표시가 나타나고 기기 임시 저장을 유지합니다. 서버 마감 이후 제출은 거절됩니다. 현황판 연결 표시는 최근 45초 이내 조회 여부이며 프로젝터 전원이나 화면 가시성을 보장하지는 않습니다.
 
@@ -53,10 +53,11 @@ npm run test:e2e
 이번 변경에서는 운영 SQL, Edge 배포, main 병합을 실행하지 않았습니다. 다음 순서를 지켜 DB와 프런트엔드 버전이 어긋나지 않게 적용합니다.
 
 1. 수업 종료 후 CSV와 DB 백업을 확보합니다. 별도 Supabase 테스트 프로젝트에 현재 운영 스키마를 복제하고 아래 migration을 먼저 적용합니다.
-2. 기존 migration 이력을 확인하고 `supabase/migrations/`의 다음 세 파일을 순서대로 검토·적용합니다. 각 파일은 트랜잭션 안에서 실행하고 실패 시 롤백합니다. 운영에는 검토된 migration만 적용합니다.
+2. 기존 migration 이력을 확인하고 `supabase/migrations/`의 다음 네 파일을 순서대로 검토·적용합니다. 각 파일은 트랜잭션 안에서 실행하고 실패 시 롤백합니다. 운영에는 검토된 migration만 적용합니다.
    - `20261022155414_classroom_access_delays.sql`
    - `20261022155416_classroom_submission_recovery.sql`
    - `20261022155419_classroom_presentation_controls.sql`
+   - `20261023000100_unrestricted_investment_reasons.sql`
 3. `supabase/schema.sql`은 새 설치의 기준 스키마입니다. 기존 운영 DB에 전체 재실행하지 마세요. 과거 company_codes.sql/reopen_investment.sql도 이번 migration 뒤에 재실행하지 마세요. 함수 정의를 과거 버전으로 되돌릴 수 있습니다.
 4. Edge Function은 `supabase/edge.ts`와 `supabase/edge-handler.js`를 함께 배포합니다. 기존 배포 방식의 엔트리포인트를 유지하거나 아래처럼 기본 디렉터리에 두 파일을 복사해 CLI로 배포합니다. service_role 키는 서버 환경에만 둡니다.
 
@@ -71,3 +72,9 @@ supabase functions deploy idea-market --project-ref YOUR_PROJECT_REF --no-verify
 6. Vercel Root Directory는 `idea-market`, 빌드는 `npm run build`, 출력은 `dist`입니다. 배포 후 강사·학생·현황판을 새로 열어 적용 버전을 확인합니다.
 
 플랫폼 JWT 검사는 사용하지 않지만 Edge/RPC가 자체 기기·강사·현황판 토큰과 서버 권한을 검사합니다. 되돌릴 때는 운영 데이터를 보존한 채 프런트엔드와 Edge를 이전 버전으로 복구하고, 추가 컬럼/테이블을 급하게 삭제하지 마세요.
+
+## 화면 구성과 투자 이유
+
+PC 강사 화면은 왼쪽 수업 단계, 가운데 설정/진행 작업, 오른쪽 수업 요약으로 구성합니다. 모바일에서는 같은 순서를 세로로 배치합니다. 학생 화면은 금액·빠른 배분·이유 입력을 같은 카드 규격으로 제공하고, 현황판은 순위와 의견을 분리합니다. 한글 Noto Sans KR 가변 글꼴을 앱에 포함하며 글꼴 CDN에 의존하지 않습니다.
+
+투자 이유의 최소/최대 글자 수 제한과 자동 잘라내기를 제거했습니다. 이유 작성 자체는 필수이며 공백만 있는 이유는 서버에서 거절합니다. 긴 이유는 DB와 자기 제출 요약에 그대로 보관하고 현황판에서 줄바꿈·스크롤로 표시합니다. 개별 이유의 글자 수 제한은 없지만 기존 Edge의 전체 요청 크기 보호(16,000자)는 유지됩니다. 글이 매우 길거나 투자 대상이 많으면 전체 요청 크기 제한에 걸릴 수 있습니다.
