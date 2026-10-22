@@ -7,7 +7,7 @@ export async function makeDatabase(){const db=new PGlite();await db.exec(`
  create schema extensions;
  create function extensions.gen_salt(text) returns text language sql as $$ select 'test-salt'::text $$;
  create function extensions.crypt(text,text) returns text language sql as $$ select md5($1||'test-only') $$;
- create function extensions.digest(text,text) returns bytea language sql as $$ select decode(md5($1)||md5($1),'hex') $$;
+ create function extensions.digest(text,text) returns bytea language sql as $$ select sha256(convert_to($1,'UTF8')) $$;
  create function extensions.gen_random_bytes(int) returns bytea language sql as $$ select substring(decode(repeat(md5(gen_random_uuid()::text),greatest(1,$1)),'hex') from 1 for $1) $$;
  grant usage on schema extensions to service_role;
  `);return db;}
