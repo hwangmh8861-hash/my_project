@@ -6,3 +6,6 @@ dist/
 test-results/
 
 .runtime/
+
+supabase/.temp/
+playwright-report/
