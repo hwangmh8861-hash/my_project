@@ -43,6 +43,18 @@ begin
  if not result ? 'error' then raise exception 'self investment allowed';end if;
  result:=idea_codes_test.rpc('submit',d2,jsonb_build_object('epoch',ep,'confirmed',true,'items',jsonb_build_array(jsonb_build_object('to',2,'amount',5000,'reason','실제로 활용 가능한 좋은 아이디어입니다.'))));
  if result ? 'error' or (result->'mine'->>'submitted')::boolean is distinct from true then raise exception 'valid submission failed';end if;
+ -- Reopening preserves data and restarts timer; only instructor may reopen.
+ perform idea_codes_test.rpc('close',a);
+ update idea_codes_test.room set timer_minutes=5;
+ result:=idea_codes_test.rpc('start',stranger);
+ if result->>'code' is distinct from 'UNAUTHORIZED' then raise exception 'student reopened class';end if;
+ result:=idea_codes_test.rpc('start',a);
+ if result->>'status' is distinct from 'open' or result->>'epoch' is distinct from ep then raise exception 'class did not reopen';end if;
+ if not exists(select 1 from idea_codes_test.teams where id=1 and submitted and device_hash=d2 and entry_code=code1) or not exists(select 1 from idea_codes_test.investments where sender=1) then raise exception 'reopen lost submission or connection';end if;
+ if not exists(select 1 from idea_codes_test.room where deadline>clock_timestamp()+interval '4 minutes') then raise exception 'reopen timer did not restart';end if;
+ result:=idea_codes_test.rpc('start',a);
+ if not result ? 'error' then raise exception 'double start allowed';end if;
+
  result:=idea_codes_test.rpc('claim',d3,jsonb_build_object('epoch',ep,'entryCode',code1));
  if (result->'mine'->>'submitted')::boolean is distinct from true then raise exception 'submitted state lost during takeover';end if;
  result:=idea_codes_test.rpc('submit',d3,jsonb_build_object('epoch',ep,'confirmed',true,'items',jsonb_build_array(jsonb_build_object('to',2,'amount',5000,'reason','실제로 활용 가능한 좋은 아이디어입니다.'))));

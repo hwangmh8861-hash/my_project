@@ -14,3 +14,5 @@ test('board/QR never render entry codes',async()=>{const f={...fixture};delete f
 assert(!d.window.document.body.textContent.includes('1200'));d.window.close();
 const boardFn=source.slice(source.indexOf('function renderBoard'),source.indexOf('function animateMoney'));assert(!boardFn.includes('entryCode'));assert(!boardFn.includes('entrycodes'));
 });
+
+test('closed class can reopen and active class cannot start twice',async()=>{let state={...fixture,status:'closed',display:'results'},calls=[];const dom=await setup('admin',b=>{calls.push(b);if(b.action==='start')state={...state,status:'open',display:'live'};return state});const w=dom.window;const button=w.document.querySelector('[data-do="start"]');assert.equal(button.disabled,false);assert.equal(button.textContent,'투자 다시 열기');button.click();await flush();assert(calls.some(b=>b.action==='start'));assert.equal(w.document.querySelector('[data-do="start"]').disabled,true);assert(w.document.body.textContent.includes('새 수업 준비'));dom.window.close()});

@@ -61,7 +61,7 @@ begin
   for v,n in select value,ordinality::int from jsonb_array_elements(names) with ordinality loop update idea_private.teams set name=btrim(v#>>'{}') where id=n; if not found then insert into idea_private.teams(id,name) values(n,btrim(v#>>'{}'));end if;end loop;
   update idea_private.room set budget=amt,timer_minutes=case when status='ready' then (p_data->>'minutes')::int else timer_minutes end where id=1 returning * into r;changed:=true;
  elsif p_action='start' then
-  if r.status<>'ready' then return jsonb_build_object('error','이미 시작했거나 마감된 수업입니다.');end if;
+  if r.status='open' then return jsonb_build_object('error','이미 투자가 진행 중입니다.');end if;
   update idea_private.room set status='open',display='live',deadline=case when timer_minutes>0 then clock_timestamp()+timer_minutes*interval '1 minute' else null end where id=1 returning * into r;changed:=true;
  elsif p_action='close' then
   update idea_private.room set status='closed',display='results' where id=1 returning * into r;changed:=true;
