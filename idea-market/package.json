@@ -1,0 +1,27 @@
+{
+  "name": "idea-market",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "directories": {
+    "test": "tests"
+  },
+  "scripts": {
+    "build": "vite build",
+    "test": "node --test tests/domain.test.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "dependencies": {
+    "@supabase/supabase-js": "2.118.0",
+    "qrcode": "1.5.4",
+    "vite": "8.3.4"
+  },
+  "private": true,
+  "devDependencies": {
+    "https-proxy-agent": "9.1.0",
+    "ws": "8.22.0"
+  }
+}
