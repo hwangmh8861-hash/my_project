@@ -111,10 +111,10 @@ begin
   if n<>(select count(*) from idea_private.teams) and (r.status<>'ready' or exists(select 1 from idea_private.teams where device_hash is not null) or exists(select 1 from idea_private.investments)) then
    if coalesce(p_data->>'confirmReconfigure','')<>'RECONFIGURE' then return jsonb_build_object('error','조 개수를 변경하려면 현재 투자와 학생 접속 초기화를 확인해 주세요.','code','RECONFIGURE_REQUIRED');end if;
    select coalesce(array_agg(entry_code),'{}') into old_codes from idea_private.teams;
-   delete from idea_private.investments;
-   delete from idea_private.teams;
-   delete from idea_private.code_attempts;
-   delete from idea_private.code_failures;
+   delete from idea_private.investments where id is not null;
+   delete from idea_private.teams where id is not null;
+   delete from idea_private.code_attempts where device_hash is not null;
+   delete from idea_private.code_failures where failed_at is not null;
    for v,n in select value,ordinality::int from jsonb_array_elements(names) with ordinality loop insert into idea_private.teams(id,name,entry_code) values(n,btrim(v#>>'{}'),idea_private.default_entry_code(n));end loop;
    update idea_private.room set status='ready',epoch=gen_random_uuid(),deadline=null,revealed_at=null,display='qr',focus=1 where id=1 returning * into r;
   end if;
@@ -158,10 +158,10 @@ begin
   if (p_data->>'confirm') is distinct from 'RESET' then return jsonb_build_object('error','초기화 확인이 필요합니다.');end if;
   select count(*) into n from idea_private.teams;
   select coalesce(array_agg(code),'{}'::text[]) into old_codes from idea_private.entry_code_history;
-  delete from idea_private.entry_code_history;
-  delete from idea_private.investments;
-  if coalesce((p_data->>'keep')::boolean,true) then update idea_private.teams set entry_code=idea_private.new_entry_code(old_codes);update idea_private.teams set entry_code=idea_private.default_entry_code(id),device_hash=null,representative_name=null,joined_at=null,working=false,submitted=false,returned_items='[]'::jsonb,draft_version=draft_version+1;
-  else delete from idea_private.teams;insert into idea_private.teams(id,name,entry_code) select i,i||'조 회사',idea_private.default_entry_code(i) from generate_series(1,n) i;end if;
+  delete from idea_private.entry_code_history where code is not null;
+  delete from idea_private.investments where id is not null;
+  if coalesce((p_data->>'keep')::boolean,true) then update idea_private.teams set entry_code=idea_private.new_entry_code(old_codes) where id is not null;update idea_private.teams set entry_code=idea_private.default_entry_code(id),device_hash=null,representative_name=null,joined_at=null,working=false,submitted=false,returned_items='[]'::jsonb,draft_version=draft_version+1 where id is not null;
+  else delete from idea_private.teams where id is not null;insert into idea_private.teams(id,name,entry_code) select i,i||'조 회사',idea_private.default_entry_code(i) from generate_series(1,n) i;end if;
   update idea_private.room set status='ready',epoch=gen_random_uuid(),deadline=null,revealed_at=null,display='qr',focus=1,budget=case when (p_data->>'keep')::boolean then budget else 5000 end,timer_minutes=case when (p_data->>'keep')::boolean then timer_minutes else 0 end where id=1 returning * into r;changed:=true;
  elsif p_action='pin' then
   if coalesce(p_data->>'pin','') !~ '^\d{4}$' then return jsonb_build_object('error','비밀번호는 숫자 4자리입니다.');end if;
@@ -179,8 +179,8 @@ begin
   if not found then return jsonb_build_object('error','회사를 찾을 수 없습니다.');end if;
   changed:=true;
  elsif p_action='clear_entry_limits' then
-  delete from idea_private.code_attempts;
-  delete from idea_private.code_failures;
+  delete from idea_private.code_attempts where device_hash is not null;
+  delete from idea_private.code_failures where failed_at is not null;
   update idea_private.room set entry_limit_version=entry_limit_version+1 where id=1 returning * into r;changed:=true;
  elsif p_action='claim' then
   stamp:=clock_timestamp();
