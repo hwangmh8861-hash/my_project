@@ -117,61 +117,51 @@ function enteredCode(){return [...document.querySelectorAll('[data-digit]')].map
 function updateCodeWait(){if(!$('#claim'))return;const secs=Math.max(0,Math.ceil((codeWaitUntil-Date.now())/1000));document.querySelectorAll('[data-digit]').forEach(el=>el.disabled=secs>0||busy||!storageOK);$('#enterbutton').disabled=secs>0||!storageOK||busy||enteredCode().length!==4;$('#codewait').textContent=secs>0?`${secs}초 후 코드를 다시 입력해 주세요.`:'';}
 async function claimCode(){const code=enteredCode();if(!/^[0-9]{4}$/.test(code)||codeWaitUntil>Date.now()||busy||!storageOK)return;await action('claim',{entryCode:code,epoch:s.epoch});updateCodeWait();}
 function fillCode(start,text){const digits=[...document.querySelectorAll('[data-digit]')],values=text.replace(/[^0-9]/g,'').slice(0,4-start);for(let i=0;i<values.length;i++)digits[start+i].value=values[i];digits[Math.min(3,start+values.length)]?.focus();updateCodeWait();if(enteredCode().length===4)claimCode();}
-async function copyStudentAddress(){try{if(navigator.clipboard?.writeText)await navigator.clipboard.writeText(studentUrl());else{const el=document.createElement('textarea');el.value=studentUrl();document.body.append(el);el.select();if(!document.execCommand('copy'))throw Error();el.remove()}toast('주소를 복사했어요. Safari 또는 Chrome에서 열어 주세요.')}catch{showModal(…7408 tokens truncated…set next_at=stamp+interval '5 seconds' where device_hash=p_token;
-  select * into t from idea_private.teams where entry_code=p_data->>'entryCode' and coalesce(p_data->>'entryCode','') ~ '^[0-9]{4}$';
-  if not found then
-   insert into idea_private.code_failures default values;
-   update idea_private.code_attempts set failures=failures+1,blocked_until=case when failures+1>=5 then stamp+interval '1 minute' else null end where device_hash=p_token returning * into code_state;
-   update public.idea_market_signal set revision=revision+1 where id=1;
-   if code_state.failures>=5 then return jsonb_build_object('error','코드를 5번 틀렸어요. 1분 후 다시 입력해 주세요.','code','CODE_WAIT','retryAfter',60);end if;
-   if failure_count+1>100 then return jsonb_build_object('error','5초 후 코드를 다시 입력해 주세요.','code','CODE_WAIT','retryAfter',5);end if;
-   return jsonb_build_object('error','회사 코드를 확인해 주세요.','code','INVALID_CODE','attemptsLeft',5-code_state.failures);
-  end if;
-  if exists(select 1 from idea_private.teams where device_hash=p_token and id<>t.id) then return jsonb_build_object('error','이미 다른 회사로 접속한 기기입니다.','code','ALREADY_CONNECTED');end if;
-  delete from idea_private.code_attempts where device_hash=p_token;
-  if t.device_hash is distinct from p_token then
-   update idea_private.teams set device_hash=p_token,working=false,draft_version=draft_version+1 where id=t.id;
-   changed:=true;
-  end if;
- elsif p_action in ('working','submit') then
-  select * into t from idea_private.teams where device_hash=p_token;
-  if not found then return jsonb_build_object('error','기기 연결이 해제되었습니다.','code','RELEASED');end if;
-  if r.status<>'open' then
-   if changed then update public.idea_market_signal set revision=revision+1 where id=1;end if;
-   return jsonb_build_object('error','투자가 마감되었거나 아직 시작되지 않았습니다.','code','CLOSED');
-  end if;
-  if t.submitted then return jsonb_build_object('error','이미 제출한 회사입니다.','code','SUBMITTED');end if;
-  if p_action='working' then if not t.working then update idea_private.teams set working=true where id=t.id;changed:=true;end if;
-  else
-   if (p_data->>'confirmed') is distinct from 'true' then return jsonb_build_object('error','조원 모두와 상의했는지 확인해 주세요.');end if;
-   if jsonb_typeof(p_data->'items')<>'array' or jsonb_array_length(p_data->'items')<1 then return jsonb_build_object('error','투자 내용을 확인해 주세요.');end if;
-   for v in select value from jsonb_array_elements(p_data->'items') loop
-    if coalesce(v->>'amount','') !~ '^\d+$' or coalesce(v->>'to','') !~ '^\d+$' then return jsonb_build_object('error','금액은 100만 원 단위의 숫자로 입력해 주세요.');end if;
-    n:=(v->>'to')::int;amt:=(v->>'amount')::int;
-    if n=t.id or n=any(ids) or not exists(select 1 from idea_private.teams where id=n) or amt<=0 or amt%100<>0 or coalesce(v->>'reason','') ~ '^[[:space:]]*$' then return jsonb_build_object('error','자기 회사 투자, 중복 대상, 금액 또는 투자 이유를 확인해 주세요.');end if;
-    ids:=array_append(ids,n);total:=total+amt;
-   end loop;
-   if total<>r.budget then return jsonb_build_object('error','투자금 전액을 배분해 주세요.');end if;
-   insert into idea_private.investments(sender,recipient,amount,reason) select t.id,(x->>'to')::int,(x->>'amount')::int,btrim(x->>'reason') from jsonb_array_elements(p_data->'items') x;
-   update idea_private.teams set submitted=true,working=false,returned_items='[]'::jsonb where id=t.id;changed:=true;
-  end if;
- elsif p_action not in ('student','board','admin','tick') then return jsonb_build_object('error','지원하지 않는 요청입니다.');
- end if;
- if p_action='board' then update idea_private.room set board_seen_at=clock_timestamp() where id=1 returning * into r;end if;
- if changed then update public.idea_market_signal set revision=revision+1 where id=1;end if;
- out_json:=jsonb_build_object('status',r.status,'budget',r.budget,'epoch',r.epoch,'deadline',r.deadline,'minutes',r.timer_minutes,'display',r.display,'focus',r.focus,'now',clock_timestamp(),'entryLimitVersion',r.entry_limit_version,'revision',(select revision from public.idea_market_signal where id=1));
- if p_action='tick' then return jsonb_build_object('ok',true);end if;
- if (admin and p_action<>'student') or board then
-  select coalesce(jsonb_agg(jsonb_build_object('id',q.id,'name',q.name,'connected',q.device_hash is not null,'working',q.working,'submitted',q.submitted,'total',coalesce((select sum(amount) from idea_private.investments where recipient=q.id),0)) order by q.id),'[]'::jsonb) into list from idea_private.teams q;
-  select coalesce(jsonb_agg(to_jsonb(i) order by created_at desc,id),'[]'::jsonb) into entries from idea_private.investments i;
-  out_json:=out_json||jsonb_build_object('teams',list,'investments',entries,'revealedAt',r.revealed_at,'revealVersion',r.reveal_version);
-  if admin and p_action<>'board' then out_json:=out_json||jsonb_build_object('boardConnected',coalesce(r.board_seen_at>clock_timestamp()-interval '45 seconds',false),'entryLimited',(select count(*)>100 from idea_private.code_failures where failed_at>clock_timestamp()-interval '15 minutes') or exists(select 1 from idea_private.code_attempts where blocked_until>clock_timestamp()),'boardKey',r.board_key,'entryCodes',(select coalesce(jsonb_agg(jsonb_build_object('id',id,'entryCode',entry_code) order by id),'[]'::jsonb) from idea_private.teams));end if;
- else
-  select coalesce(jsonb_agg(jsonb_build_object('id',q.id,'name',q.name,'taken',q.device_hash is not null) order by q.id),'[]'::jsonb) into list from idea_private.teams q where exists(select 1 from idea_private.teams me where me.device_hash=p_token);
-  select jsonb_build_object('id',id,'name',name,'submitted',submitted,'working',working,'draftVersion',draft_version,'items',case when submitted then (select coalesce(jsonb_agg(jsonb_build_object('to',recipient,'amount',amount,'reason',reason) order by recipient),'[]'::jsonb) from idea_private.investments where sender=idea_private.teams.id) else returned_items end) into mine from idea_private.teams where device_hash=p_token;
-  out_json:=out_json||jsonb_build_object('teams',list,'mine',mine);
- end if;
- return out_json;
-end $$;
-revoke all on function public.idea_market_rpc(text,text,jsonb,text) from public,anon,authenticated;
-grant execute on function public.idea_market_rpc(text,text,jsonb,text) to service_role;
+async function copyStudentAddress(){try{if(navigator.clipboard?.writeText)await navigator.clipboard.writeText(studentUrl());else{const el=document.createElement('textarea');el.value=studentUrl();document.body.append(el);el.select();if(!document.execCommand('copy'))throw Error();el.remove()}toast('주소를 복사했어요. Safari 또는 Chrome에서 열어 주세요.')}catch{showModal(`<h2>학생 접속 주소</h2><p>주소를 길게 눌러 복사해 주세요.</p><input readonly value="${e(studentUrl())}" aria-label="학생 접속 주소"><button data-do="dismiss">닫기</button>`)}}
+function renderEntryCodes(){const el=$('#entrycodes');if(!el)return;el.innerHTML=s.teams.map(t=>`<article class="codeitem"><div><strong>${e(t.name)}</strong><b class="companycode">${e(s.entryCodes?.find(x=>x.id===t.id)?.entryCode||'—')}</b></div><button class="small" data-code-menu="${t.id}" aria-label="${e(t.name)} 코드 관리">코드 관리</button></article>`).join('');}
+function openPrintCards(){if(role!=='admin'||!s?.entryCodes)return;const view=document.createElement('div');view.id='printcards';document.body.append(view);document.body.classList.add('printview');renderPrintCards();}
+function renderPrintCards(){const el=$('#printcards');if(!el)return;let pages=[];for(let i=0;i<s.teams.length;i+=6)pages.push(s.teams.slice(i,i+6));el.innerHTML=`<div class="printtoolbar"><h1>회사 코드 카드</h1><span>A4 세로 · 한 장에 6개</span><button data-do="closeprint">닫기</button><button class="primary" data-do="printnow">인쇄</button></div>${pages.map(teams=>`<section class="printpage">${teams.map(t=>`<article class="printcard"><small>투자 시뮬레이터 · 학생용</small><h2>${e(t.name)}</h2><p>회사 입장 코드</p><strong>${e(s.entryCodes.find(x=>x.id===t.id)?.entryCode||'—')}</strong><span>학생 화면에서 4자리 입력</span></article>`).join('')}</section>`).join('')}`;}
+
+document.addEventListener('submit',async ev=>{ev.preventDefault();const f=ev.target;if(busy)return;if(f.id==='login'){if(loginWaitUntil>Date.now())return;busy=true;updateLoginWait();try{const b=await api('login',{pin:$('#pin').value},device);loginWaitUntil=0;write('im-login-wait','0');adminToken=b.token;write('im-admin',adminToken);await refresh()}catch(err){toast(err.message);if(err.code==='LOGIN_WAIT'){loginWaitUntil=Date.now()+Number(err.retryAfter||30)*1000;write('im-login-wait',String(loginWaitUntil))}}finally{busy=false;updateLoginWait()}}else if(f.id==='claim'){await claimCode()}else if(f.id==='settings'){const data={names:[...document.querySelectorAll('.name')].map(el=>el.value.trim()),budget:Number($('#budget').value),minutes:Number($('#minutes').value)};const reconfigure=data.names.length!==s.teams.length&&(s.status!=='ready'||s.teams.some(t=>t.connected||t.submitted));if(reconfigure){pendingSettings=data;showModal(`<h2>조 개수 변경</h2><p><strong>${s.teams.length}개 조 → ${data.names.length}개 조</strong>로 변경합니다.</p><p>현재 투자 내역과 학생 접속을 초기화하고 새 수업을 준비합니다. 입력한 회사 이름과 설정은 적용됩니다.</p><p>보관할 결과가 있다면 먼저 관리 탭에서 내려받아 주세요.</p><div class="actions"><button data-do="dismiss">돌아가기</button><button class="danger" data-do="confirmteams">초기화하고 조 개수 변경</button></div>`);return}const ok=await action('settings',data);if(ok){delete $('#settings').dataset.dirty;fillSettings();toast('설정을 저장했습니다.')}}});
+document.addEventListener('input',ev=>{const el=ev.target;if(el.dataset.digit!==undefined){const text=ev.data&&/^[0-9]{2,4}$/.test(ev.data)?ev.data:el.value;el.value='';fillCode(Number(el.dataset.digit),text);return}if(el.closest('#settings'))$('#settings').dataset.dirty='1';if(el.dataset.amount){const id=el.dataset.amount;draft[id]||={amount:0,reason:''};draft[id].amount=el.value;changed(id)}if(el.dataset.reason){const id=el.dataset.reason;draft[id]||={amount:0,reason:''};draft[id].reason=el.value;changed(id)}if(el.id==='agreed')$('#finalsubmit').disabled=!el.checked;});
+document.addEventListener('change',ev=>{if(ev.target.id==='count'){$('#settings').dataset.dirty='1';let n=Number(ev.target.value);if(Number.isInteger(n)&&n>=2&&n<=30){const ns=[...document.querySelectorAll('.name')].map(el=>el.value);renderNames(Array.from({length:n},(_,i)=>ns[i]||`${i+1}조 회사`))}}});
+document.addEventListener('paste',ev=>{if(ev.target.dataset.digit!==undefined){ev.preventDefault();fillCode(0,ev.clipboardData.getData('text'))}});
+document.addEventListener('keydown',ev=>{if(ev.target.dataset.digit!==undefined){const fields=[...document.querySelectorAll('[data-digit]')],i=Number(ev.target.dataset.digit);if(ev.key==='Backspace'&&!ev.target.value&&i>0){ev.preventDefault();fields[i-1].value='';fields[i-1].focus();updateCodeWait()}if(ev.key==='ArrowLeft'&&i>0)fields[i-1].focus();if(ev.key==='ArrowRight'&&i<3)fields[i+1].focus();}if(ev.target.dataset.tab&&['ArrowLeft','ArrowRight','Home','End'].includes(ev.key)){ev.preventDefault();const tabs=[...document.querySelectorAll('[data-tab]')],i=tabs.indexOf(ev.target),n=ev.key==='Home'?0:ev.key==='End'?tabs.length-1:(i+(ev.key==='ArrowRight'?1:-1)+tabs.length)%tabs.length;selectAdminTab(tabs[n].dataset.tab);tabs[n].focus();return}if(ev.key==='Enter'&&ev.target.classList.contains('name')&&!ev.isComposing){ev.preventDefault();const ns=[...document.querySelectorAll('.name')],i=ns.indexOf(ev.target);(ns[i+1]||$('#settings button')).focus()}if(ev.key==='Escape'&&!modal.hidden)hideModal();if(ev.key==='Tab'&&!modal.hidden){const ns=[...modal.querySelectorAll('button:not(:disabled),input,select,textarea,[tabindex="0"]')];if(!ns.length)return;if(ev.shiftKey&&document.activeElement===ns[0]){ev.preventDefault();ns[ns.length-1].focus()}else if(!ev.shiftKey&&document.activeElement===ns[ns.length-1]){ev.preventDefault();ns[0].focus()}}});
+document.addEventListener('click',async ev=>{const el=ev.target.closest('button');if(!el||el.disabled)return;
+ if(el.dataset.countStep){const input=$('#count');if(!input||input.disabled)return;input.value=Math.max(2,Math.min(30,Number(input.value)+Number(el.dataset.countStep)));input.dispatchEvent(new Event('input',{bubbles:true}));input.dispatchEvent(new Event('change',{bubbles:true}));return}
+ if(el.dataset.codeMenu){const id=Number(el.dataset.codeMenu),code=String(id<=9?id*1000+1:9001+id-9);showModal(`<h2>${e(teamName(id))} 코드 관리</h2><p>기본 코드: <strong>${code}</strong></p><div class="companymenu"><button data-restore-code="${id}">기본 코드로 복원</button><button data-reissue="${id}">새 코드 발급</button><button data-do="dismiss">닫기</button></div>`);return}
+ if(el.dataset.restoreCode){if(confirm('기본 코드로 복원할까요? 기존 기기 연결은 해제되고 투자 내역은 유지됩니다.')){if(await action('restore_code',{company:Number(el.dataset.restoreCode)})){hideModal();toast('기본 코드로 복원했습니다.')}}return}
+ if(el.dataset.tab){selectAdminTab(el.dataset.tab);return}if(el.dataset.more){showCompanyMore(Number(el.dataset.more));return}
+ if(el.dataset.adjust||el.dataset.all||el.dataset.zero){if(closed()||s.status!=='open')return;const id=el.dataset.adjust||el.dataset.all||el.dataset.zero;draft[id]||={amount:0,reason:''};const old=Number(draft[id].amount)||0;let value=el.dataset.zero?0:el.dataset.all?Math.max(0,s.budget-(total()-old)):Math.max(0,Math.min(s.budget,old+Number(el.dataset.delta)));draft[id].amount=value;$('#amount-'+id).value=value;changed(id);return}
+ if(el.dataset.reissue){if(confirm(teamName(Number(el.dataset.reissue))+'의 입장 코드를 재발급할까요? 기존 코드와 접속 기기는 사용할 수 없게 됩니다. 제출 내역은 유지됩니다.')){if(await action('reissue',{company:Number(el.dataset.reissue)})){hideModal();toast('입장 코드를 재발급했습니다.')}}return}
+ if(el.dataset.cancel){if(closed()){hideModal();adminMore=null;return}if(confirm(teamName(Number(el.dataset.cancel))+'의 제출을 취소할까요? 유치 금액에서 차감되고 다시 작성할 수 있습니다.'))await action('cancel',{company:Number(el.dataset.cancel)});hideModal();adminMore=null;return}
+ if(el.dataset.release){if(confirm(teamName(Number(el.dataset.release))+'의 기기 연결을 해제할까요? 기존 기기의 투자 권한이 해제됩니다. 제출 내역은 유지됩니다.'))await action('release',{company:Number(el.dataset.release)});hideModal();adminMore=null;return}
+ const a=el.dataset.do;
+ if(a==='confirmteams'&&pendingSettings){const data=pendingSettings;const ok=await action('settings',{...data,confirmReconfigure:'RECONFIGURE'});if(ok){pendingSettings=null;hideModal();delete $('#settings').dataset.dirty;fillSettings();toast('조 개수를 변경했습니다. 새 입장 코드를 전달해 주세요.')}return}
+ if(a==='printcards'){openPrintCards();return}if(a==='closeprint'){document.querySelector('#printcards')?.remove();document.body.classList.remove('printview');return}if(a==='printnow'){window.print();return}
+ if(a==='copyaddress')await copyStudentAddress();
+ if(a==='reload')refresh();if(a==='review')review();if(a==='dismiss'){adminMore=null;hideModal();}
+ if(a==='submit'){if(!$('#agreed')?.checked||closed())return;el.disabled=true;const ok=await action('submit',{epoch:s.epoch,confirmed:true,items:Object.entries(draft).filter(([,d])=>Number(d.amount)>0).map(([id,d])=>({to:Number(id),amount:Number(d.amount),reason:d.reason.trim()}))});if(ok){hideModal();toast('제출 완료')}else if($('#finalsubmit'))$('#finalsubmit').disabled=false;}
+ if(a==='logout'){await action('logout');adminToken='';write('im-admin','');s=null;renderLogin()}
+ if(a==='start'){if($('#settings')?.dataset.dirty)return toast('변경한 설정을 먼저 저장해 주세요.');if(confirm(s.status==='closed'?'기존 제출 내역을 유지하고 투자를 다시 열까요? 미제출 회사만 추가로 제출할 수 있습니다. 타이머는 설정한 시간부터 다시 시작합니다.':'투자를 시작할까요?'))await action('start')}
+ if(a==='close'&&confirm('투자를 마감할까요? 작성 중인 학생도 더 이상 제출할 수 없습니다.'))await action('close');
+ if(a==='extend')await action('extend');
+ if(a==='clearentry'&&confirm('모든 기기의 입장 대기와 실패 기록을 해제할까요?'))await action('clear_entry_limits');
+ if(a==='reveal')await action('reveal');
+ if(a==='qr'||a==='results'||a==='reasons')await action('display',{mode:a==='qr'?'qr':a,focus:s.focus});
+ if(a==='prev'||a==='next'){const ids=s.teams.map(t=>t.id),index=ids.indexOf(s.focus);await action('display',{mode:'reasons',focus:ids[(index+(a==='next'?1:-1)+ids.length)%ids.length]})}
+ if(a==='csvsummary')download('summary');if(a==='csvdetail')download('detail');
+ if(a==='reset')showModal('<h2>전체 초기화</h2><p>투자 내역과 모든 기기 연결이 삭제되고 입장 코드는 기본값으로 돌아갑니다.<br>필요한 결과는 CSV로 먼저 내려받아 주세요.</p><label class="check"><input id="keep" type="checkbox" checked>회사 이름과 투자금·타이머 설정 유지</label><div class="actions"><button data-do="dismiss">취소</button><button data-do="resetfinal" class="danger">초기화 계속</button></div>');
+ if(a==='resetfinal'){const keep=$('#keep').checked;if(confirm('마지막 확인입니다. 모든 투자 내역을 삭제할까요? 이 작업은 되돌릴 수 없습니다.')){if(await action('reset',{confirm:'RESET',keep})){hideModal();toast('초기화했습니다.')}}}
+ if(a==='pin')showModal('<h2>비밀번호 변경</h2><label for="newpin">새 비밀번호 4자리</label><input id="newpin" type="password" inputmode="numeric" maxlength="4" autocomplete="new-password"><div class="actions"><button data-do="dismiss">취소</button><button class="primary" data-do="savepin">변경</button></div>');
+ if(a==='savepin'){const pin=$('#newpin').value;if(!/^\d{4}$/.test(pin))return toast('숫자 4자리를 입력해 주세요.');if(await action('pin',{pin})){hideModal();toast('비밀번호를 변경했습니다.')}}
+});
+client.channel('idea-market-state').on('postgres_changes',{event:'UPDATE',schema:'public',table:'idea_market_signal',filter:'id=eq.1'},()=>refresh()).subscribe(status=>{live=status==='SUBSCRIBED';connectivity();if(live)refresh()});
+window.addEventListener('online',()=>{online=true;refresh();connectivity()});window.addEventListener('offline',()=>{online=false;connectivity();updateWallet()});document.addEventListener('visibilitychange',()=>{if(!document.hidden)refresh()});
+schedulePoll();
+setInterval(()=>{updateCodeWait();updateLoginWait();if(!s)return;document.querySelectorAll('.timer').forEach(el=>el.textContent=clock());if(s.status==='open'&&left()===0){if(!lastDeadline){lastDeadline=true;hideModal();if(role==='student')renderStudent();if(role==='admin')updateAdminStatus();refresh()}}else lastDeadline=false;},250);
+setInterval(()=>{if(role==='board'&&s){const count=s.display==='reasons'?s.investments.filter(i=>i.recipient===s.focus).length:s.teams.length;if(count>(s.display==='reasons'?3:Math.max(3,Math.min(8,Math.floor(((window.innerHeight||900)-320)/(s.teams.some(t=>Array.from(t.name).length>16)?128:100)))))){page++;renderBoard(s)}}},12000);
+connectivity();refresh();
+
+function updateKeyboard(){const focused=/INPUT|TEXTAREA/.test(document.activeElement?.tagName||'');document.body.classList.toggle('keyboard-open',focused&&!!window.visualViewport&&window.innerHeight-window.visualViewport.height>100)}
+window.visualViewport?.addEventListener('resize',updateKeyboard);document.addEventListener('focusin',updateKeyboard);document.addEventListener('focusout',()=>setTimeout(updateKeyboard,0));
