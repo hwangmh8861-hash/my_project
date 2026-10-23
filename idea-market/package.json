@@ -10,7 +10,8 @@
     "build": "vite build",
     "test": "node --test tests/*.test.js",
     "dev": "vite",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "build:review": "vite build --config vite.review.config.js && node review/routes.mjs"
   },
   "keywords": [],
   "author": "",
