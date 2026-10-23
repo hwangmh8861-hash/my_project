@@ -6,7 +6,7 @@ begin
  insert into idea_codes_test.teams(id,name,entry_code) select g,'회사'||g,idea_codes_test.default_entry_code(g) from generate_series(1,7) g;
  insert into idea_codes_test.admin_sessions values(a,now()+interval '1 hour');
  select epoch::text into ep from idea_codes_test.room;
- perform idea_codes_test.rpc('claim',d,jsonb_build_object('epoch',ep,'entryCode','1001'));perform idea_codes_test.rpc('start',a);
+ perform idea_codes_test.rpc('claim',d,jsonb_build_object('epoch',ep,'representativeName','테스트 대표','entryCode','1001'));perform idea_codes_test.rpc('start',a);
  perform idea_codes_test.rpc('submit',d,jsonb_build_object('epoch',ep,'confirmed',true,'items','[{"to":2,"amount":5000,"reason":"좋아요"}]'::jsonb));
  perform idea_codes_test.rpc('reissue',a,'{"company":1}');select entry_code into code1 from idea_codes_test.teams where id=1;
  if code1='1001' or exists(select 1 from generate_series(1,30) g where idea_codes_test.default_entry_code(g)=code1) then raise exception 'reissued code collides with defaults';end if;
