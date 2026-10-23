@@ -8,3 +8,5 @@ test('upgrade migration chain preserves working server behaviours in isolated ro
 
 test('existing server constraints, code secrecy, takeover and duplicate submission regression',async()=>{await runAssertions(db,'company-codes.assert.sql')});
 test('short and long reasons pass without truncation; blank reasons fail; upgrade and fresh schema',async()=>{await runAssertions(db,'unrestricted-reasons.assert.sql');await runAssertions(db,'unrestricted-reasons.assert.sql',true)});
+test('instructor can change 7 to 6 and 6 to 8; active class data requires explicit confirmation',async()=>{await runAssertions(db,'team-count.assert.sql');await runAssertions(db,'team-count.assert.sql',true)});
+test('reset restores default company codes; explicit restoration preserves investments and rejects students',async()=>{await runAssertions(db,'default-codes.assert.sql');await runAssertions(db,'default-codes.assert.sql',true)});

@@ -103,5 +103,5 @@ begin
  if result ? 'error' or (select entry_code from idea_codes_test.teams where id=1)<>code1 or (select count(distinct entry_code) from idea_codes_test.teams)<>4 then raise exception 'new team code or existing code preservation failed';end if;
  select array_agg(entry_code) into previous_codes from idea_codes_test.teams;
  result:=idea_codes_test.rpc('reset',a,'{"confirm":"RESET","keep":false}');
- if jsonb_array_length(result->'teams')<>4 or exists(select 1 from idea_codes_test.teams where entry_code=any(previous_codes)) then raise exception 'default reset rotation failed';end if;
+ if jsonb_array_length(result->'teams')<>4 or exists(select 1 from idea_codes_test.teams where entry_code<>idea_codes_test.default_entry_code(id)) then raise exception 'default reset rotation failed';end if;
 end $test$;
