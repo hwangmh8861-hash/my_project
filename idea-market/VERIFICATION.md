@@ -73,3 +73,16 @@ npm test 26개와 npm run build 통과. 조 추가/삭제 시 이름 보존·저
 운영 적용 전 사용자가 직접 조작할 수 있도록 실제 화면 코드와 스타일을 사용하는 별도 정적 미리보기를 만들었습니다. build:review에서 설정·SDK를 미리보기 모듈로 바꾸고 API 호출은 브라우저의 시험 데이터로 처리합니다. 빌드 결과에 운영 Supabase hostname/키가 없는지 검사했습니다. 원래 운영 빌드와 DB는 변경하지 않았습니다.
 
 Sites 내부 브라우저에서 강사 메뉴·단계 전환, 학생 시험 코드 1001 입장, 전액 배분, 짧은 이유 ‘좋아요’ 제출, 자기 제출 요약, 현황판 제출 6/6 및 의견 표시를 실제 UI 조작으로 확인했습니다. 처음 검증에서 HTTP 환경의 crypto.randomUUID와 정적 하위 경로 오류를 발견해 미리보기 전용 난수 함수와 경로별 index 파일을 추가한 뒤 다시 확인했습니다. 미리보기 저장/동기화는 같은 브라우저 안에서만 동작합니다.
+
+## 2026-10-23 운영 배포 완료
+
+사용자가 미리보기 검토 후 ‘배포해’라고 지시하여 준비된 migration의 운영 적용과 서버·프런트엔드 배포를 진행했습니다. 앞선 ‘운영 미적용’ 기록은 각 시점의 검증 이력이며, 현재 운영 상태는 이 항목이 최신입니다.
+
+- 적용: classroom_access_delays → classroom_submission_recovery → classroom_presentation_controls → unrestricted_investment_reasons. SQL 파일 내용 그대로 migration 도구로 적용했습니다. 첫 호출은 요청 상태 만료로 실행되지 않았고, migration 이력과 테이블 미생성을 확인한 뒤 재호출해 성공했습니다.
+- Supabase Edge Function idea-market v2 ACTIVE, 자체 인증을 유지하는 verify_jwt=false.
+- PR #1 병합: 542b8f84fd97737c69bc8da7c5ff84e0b79f2af9. GitHub의 Vercel 상태 success 확인. Vercel 배포 기록 AZrXio2qKWo4ykz9wy6H6H6Jpsgt.
+- 실제 https://ourstory-invest.vercel.app/admin 응답 제목 ‘투자 시뮬레이터’, 자바스크립트 /assets/index-3lX4x4A9.js 확인. 로컬 운영 빌드와 같은 파일이며 새 adminworkspace를 포함합니다. 운영 Supabase 연결을 사용하고 디자인 미리보기 도구는 포함하지 않습니다.
+- 실제 API: 기존 비밀번호로 강사 로그인 및 정상 로그아웃 성공. 강사 전용 신규 필드 확인. 현황판·학생 응답에 entryCodes 없음, 미입장 학생 응답에 타사 투자 내역·회사 목록 없음.
+- 운영 DB 이유 제약은 investments_reason_required(공백류만 있는 이유 거부)이며 10~60자 제약이 제거됐음을 메타데이터에서 확인했습니다. 운영 투자 제출 테스트는 수행하지 않았습니다.
+- 배포 전후 상태 open, 회사 7개, 기존 투자 5건 동일. 초기화·시작/마감·코드 재발급·제출 취소·투자 추가를 운영에서 실행하지 않았습니다.
+- 배포 직전 npm test 28개와 npm run build 통과. 실제 폰·학교망 검증 범위는 기존 FIELD_TEST.md와 동일하게 남아 있습니다.
