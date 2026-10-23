@@ -190,3 +190,10 @@ begin
 end $$;
 revoke all on function public.idea_market_rpc(text,text,jsonb,text) from public,anon,authenticated;
 grant execute on function public.idea_market_rpc(text,text,jsonb,text) to service_role;
+
+-- Preserve a spare credential if this pending migration is installed later.
+do $spare$ begin
+ if to_regprocedure('idea_private.install_spare_instructor_login()') is not null then
+  perform idea_private.install_spare_instructor_login();
+ end if;
+end $spare$;

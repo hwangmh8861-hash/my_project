@@ -1,12 +1,31 @@
 import {test,expect} from '@playwright/test';
 import {makeDatabase,schemaSource} from '../sql-harness.js';
 import {createHandler} from '../../supabase/edge-handler.js';
+import jsQR from 'jsqr';
+import {PNG} from 'pngjs';
 let db,handler,codes,contexts,errors;
 test.beforeEach(async()=>{db=await makeDatabase();contexts=[];errors=[];await db.exec('begin;'+schemaSource()+`insert into idea_codes_test.room(pin_hash,timer_minutes) values(extensions.crypt('1234',extensions.gen_salt('bf')),5);insert into idea_codes_test.teams(id,name) select g,g||'조 회사' from generate_series(1,6) g;set local role service_role;`);codes=(await db.query('select id,entry_code from idea_codes_test.teams order by id')).rows;handler=createHandler(async args=>{try{const r=await db.query('select idea_codes_test.rpc($1,$2,$3::jsonb,$4) as result',[args.p_action,args.p_token,JSON.stringify(args.p_data),args.p_ip]);return {data:r.rows[0].result}}catch(e){return {error:{code:e.code,message:e.message}}}})});
 test.afterEach(async()=>{for(const c of contexts)await c.close();await db.exec('rollback');expect((await db.query("select to_regnamespace('idea_codes_test') as schema")).rows[0].schema).toBeNull();await db.close();expect(errors).toEqual([])});
 async function device(browser,{width=390,height=844,ua}={}){const context=await browser.newContext({viewport:{width,height},...(ua?{userAgent:ua}:{}),serviceWorkers:'block'});contexts.push(context);const network={down:false};await context.route('https://**/*',route=>route.abort());await context.route('**/functions/v1/idea-market',async route=>{if(network.down)return route.abort('internetdisconnected');const request=route.request();const response=await handler(new Request(request.url(),{method:request.method(),headers:request.headers(),...(request.method()==='POST'?{body:request.postData()}: {})}));await route.fulfill({status:response.status,headers:Object.fromEntries(response.headers),body:await response.text()})});await context.routeWebSocket(/.*/,ws=>ws.close());const page=await context.newPage();page.on('pageerror',e=>errors.push(e.message));page.on('dialog',d=>d.accept());return {context,page,network}}
 async function enter(page,id){await page.goto('/s');await page.locator('#representative').fill(`테스트 대표 ${id}`);for(let i=0;i<4;i++)await page.locator(`[data-digit="${i}"]`).fill(codes[id-1].entry_code[i]);await expect(page.locator('.identity')).toBeVisible()}
 async function teacher(browser){const d=await device(browser);await d.page.goto('/admin');await d.page.getByLabel('비밀번호 4자리').fill('1234');await d.page.getByRole('button',{name:'로그인',exact:true}).click();await expect(d.page.locator('#adminsticky')).toBeVisible();return d}
+test('projector QR image decodes to student entry without instructor or company secrets',async({browser})=>{
+ const instructor=await teacher(browser);
+ const link=await instructor.page.getByRole('link',{name:'투자 현황판 열기 ↗'}).getAttribute('href');
+ const board=await device(browser,{width:1920,height:1080});await board.page.goto(link);
+ for(const [width,height] of [[1920,1080],[1280,720]]){
+  await board.page.setViewportSize({width,height});
+  const canvas=board.page.locator('#bigqr');await expect(canvas).toBeVisible();
+  const image=PNG.sync.read(await canvas.screenshot());
+  const decoded=jsQR(new Uint8ClampedArray(image.data),image.width,image.height);
+  expect(decoded?.data).toBe('http://127.0.0.1:4173/s');
+  const url=new URL(decoded.data);expect(url.search).toBe('');expect(url.hash).toBe('');
+  const phone=await device(browser,{width:375,height:667});await phone.page.goto(decoded.data);
+  await expect(phone.page.locator('[data-digit]')).toHaveCount(4);
+  await expect(phone.page.locator('#representative')).toBeVisible();
+  expect(await phone.page.locator('.companycode').count()).toBe(0);
+ }
+});
 async function openCompany(page,to){const company=page.locator(`#amount-${to}`).locator('xpath=ancestor::details');if(await company.getAttribute('open')===null)await company.locator('summary').click()}
 async function invest(page,to){await openCompany(page,to);await page.locator(`#amount-${to}`).fill('5000');await page.locator(`#reason-${to}`).fill('학생들이 실제로 자주 겪는 문제라서 수요가 클 것 같아요');await page.getByRole('button',{name:'투자 내용 확인',exact:true}).click();await page.getByLabel('조원 모두와 상의해서 결정했나요?').check();await page.getByRole('button',{name:'최종 제출',exact:true}).click();await expect(page.getByRole('heading',{name:'제출 완료',exact:true})).toBeVisible()}
 const agents=[['아이폰 사파리 화면 크기',375,'Mozilla/5.0 (iPhone; CPU iPhone OS 15_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.0 Mobile/15E148 Safari/604.1'],['갤럭시 크롬 화면 크기',390,'Mozilla/5.0 (Linux; Android 13; SM-S918N) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/100.0.4896.127 Mobile Safari/537.36'],['카카오톡 인앱 감지',430,'Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 Chrome/100.0 Mobile Safari/537.36 KAKAOTALK 26.1.0']];
