@@ -1,0 +1,33 @@
+set local role service_role;
+do $test$
+declare admin_token text:=repeat('a',64);device text:=repeat('b',64);v jsonb;spare text;old_spare text;session_token text;board text;second text;
+begin
+ insert into idea_codes_test.room(pin_hash) values(extensions.crypt('1234','test'));
+ insert into idea_codes_test.teams(id,name,entry_code) values(1,'첫 회사','1001'),(2,'둘째 회사','2001');
+ insert into idea_codes_test.admin_sessions values(admin_token,now()+interval '1 hour');
+ select encode(extensions.digest(board_key,'sha256'),'hex') into board from idea_codes_test.room where id=1;
+ v:=idea_codes_test.rpc('spare_admin',device);if v->>'code' is distinct from 'UNAUTHORIZED' then raise exception 'student created spare instructor';end if;
+ v:=idea_codes_test.rpc('spare_admin',board);if v->>'code' is distinct from 'UNAUTHORIZED' then raise exception 'board created spare instructor';end if;
+ v:=idea_codes_test.rpc('spare_admin',admin_token);spare:=v->>'pin';
+ if spare !~ '^[0-9]{4}$' or spare in ('1234','1001','2001') then raise exception 'invalid spare PIN';end if;
+ if not exists(select 1 from idea_codes_test.instructor_credentials where id='spare1' and pin_hash<>spare) then raise exception 'plaintext stored or credential missing';end if;
+ if (select count(*) from idea_codes_test.teams)<>2 or (select status from idea_codes_test.room where id=1)<>'ready' then raise exception 'credential creation modified class';end if;
+ v:=idea_codes_test.rpc('admin',admin_token);if v ? 'pin' or v::text like '%pin_hash%' or not(v ? 'entryCodes') then raise exception 'existing teacher lost access or credential leaked';end if;
+ v:=idea_codes_test.rpc('student',device);if v ? 'pin' or v ? 'entryCodes' or v::text like '%instructor_credentials%' then raise exception 'student credential disclosure';end if;
+ v:=idea_codes_test.rpc('board',board);if v ? 'pin' or v::text like '%pin_hash%' then raise exception 'board credential disclosure';end if;
+ v:=idea_codes_test.rpc('spare_admin',admin_token,'{"slot":2}');second:=v->>'pin';if second=spare or second='1234' then raise exception 'spare PINs overlap';end if;
+ v:=idea_codes_test.rpc('login',repeat('1',64),jsonb_build_object('pin',second));if not(v ? 'token') then raise exception 'second spare login failed';end if;
+ v:=idea_codes_test.rpc('spare_admin',admin_token,'{"slot":3}');if not(v ? 'error') then raise exception 'unbounded spare accounts';end if;
+ v:=idea_codes_test.rpc('login',device,jsonb_build_object('pin',spare));if not(v ? 'token') then raise exception 'spare login failed';end if;
+ session_token:=encode(extensions.digest(v->>'token','sha256'),'hex');
+ v:=idea_codes_test.rpc('admin',session_token);if v ? 'error' or not(v ? 'entryCodes') then raise exception 'spare session cannot manage class';end if;
+ v:=idea_codes_test.rpc('login',repeat('c',64),'{"pin":"1234"}');if not(v ? 'token') then raise exception 'primary PIN was changed';end if;
+ old_spare:=spare;v:=idea_codes_test.rpc('spare_admin',admin_token);spare:=v->>'pin';if spare=old_spare then raise exception 'spare reissue reused PIN';end if;
+ v:=idea_codes_test.rpc('login',repeat('d',64),jsonb_build_object('pin',old_spare));if v->>'code' is distinct from 'LOGIN_WAIT' then raise exception 'old spare PIN accepted';end if;
+ v:=idea_codes_test.rpc('admin',session_token);if v ? 'error' then raise exception 'reissue unexpectedly revoked active session';end if;
+ v:=idea_codes_test.rpc('login',repeat('2',64),jsonb_build_object('pin',second));if not(v ? 'token') then raise exception 'first spare reissue revoked second spare';end if;
+ v:=idea_codes_test.rpc('login',repeat('e',64),jsonb_build_object('pin',spare));if not(v ? 'token') then raise exception 'new spare PIN rejected';end if;
+ perform idea_codes_test.rpc('reset',admin_token,'{"confirm":"RESET","keep":true}');
+ v:=idea_codes_test.rpc('login',repeat('f',64),jsonb_build_object('pin',spare));if not(v ? 'token') then raise exception 'class reset lost instructor credential';end if;
+ if has_table_privilege('anon','idea_codes_test.instructor_credentials','select') or has_function_privilege('anon','idea_codes_test.create_spare_instructor(int)','execute') or has_function_privilege('service_role','idea_codes_test.install_spare_instructor_login()','execute') then raise exception 'private credential permission leak';end if;
+end $test$;
