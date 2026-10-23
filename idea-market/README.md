@@ -91,4 +91,4 @@ PC 강사 화면은 왼쪽 수업 단계(지난 단계 체크·지금 단계 표
 
 회사별 코드 관리를 열면 기본 코드로 복원 또는 새 코드 발급을 선택합니다. 기본 코드는 1~9조는 1001·2001·…·9001, 10~30조는 9002~9022입니다. 무작위 재발급은 이 기본 코드를 사용하지 않아 중복을 예방합니다. 전체 초기화는 설정 유지 여부와 관계없이 기본 코드로 돌아옵니다. 기본 코드 복원은 투자 내역을 유지하고 해당 기기 연결만 해제합니다.
 
-추가 migration은 20261023012000_configurable_team_count.sql 다음 20261023012500_stable_default_company_codes.sql 순서입니다.
+추가 migration은 20261023012000_configurable_team_count.sql 다음 20261023012500_stable_default_company_codes.sql 순서입니다. 그 다음 20261023020000_safeupdate_compatible_bulk_statements.sql을 적용합니다. Supabase API 연결은 safeupdate 확장 때문에 WHERE 없는 UPDATE/DELETE를 거절(SQLSTATE 21000)하므로, 전체 삭제·수정에는 반드시 where true를 붙여야 합니다. 로컬 PGlite 테스트에는 이 확장이 없어서 tests/safeupdate.test.js가 함수 본문을 직접 검사합니다.
