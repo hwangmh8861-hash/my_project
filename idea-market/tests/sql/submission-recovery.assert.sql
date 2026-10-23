@@ -7,7 +7,7 @@ begin
  insert into idea_codes_test.admin_sessions values(a,now()+interval '1 hour');
  select epoch::text into ep from idea_codes_test.room;
  select entry_code into code1 from idea_codes_test.teams where id=1;
- perform idea_codes_test.rpc('claim',d,jsonb_build_object('epoch',ep,'entryCode',code1));
+ perform idea_codes_test.rpc('claim',d,jsonb_build_object('epoch',ep,'representativeName','테스트 대표','entryCode',code1));
  perform idea_codes_test.rpc('start',a);
  payload:=jsonb_build_object('epoch',ep,'confirmed',true,'items','[{"to":2,"amount":3500,"reason":"여러 사람이 겪는 문제라서 수요가 충분할 것 같아요"},{"to":3,"amount":1500,"reason":"실제로 쉽게 사용할 수 있는 좋은 아이디어 같아요"}]'::jsonb);
  v:=idea_codes_test.rpc('submit',d,payload);if v ? 'error' then raise exception 'initial submission failed';end if;
@@ -19,7 +19,7 @@ begin
  if exists(select 1 from idea_codes_test.investments) then raise exception 'cancelled investment still counted';end if;
  v:=idea_codes_test.rpc('student',other);if v->'mine'<>'null'::jsonb or v ? 'investments' or v ? 'items' then raise exception 'other device received returned items';end if;
  select entry_code into code1 from idea_codes_test.teams where id=2;
- perform idea_codes_test.rpc('claim',other,jsonb_build_object('epoch',ep,'entryCode',code1));
+ perform idea_codes_test.rpc('claim',other,jsonb_build_object('epoch',ep,'representativeName','테스트 대표','entryCode',code1));
  v:=idea_codes_test.rpc('student',other);if v->'mine'->'items'<>'[]'::jsonb then raise exception 'other company received returned items';end if;
  v:=idea_codes_test.rpc('submit',d,payload);if v ? 'error' then raise exception 'restored submission could not resubmit';end if;
  perform idea_codes_test.rpc('close',a);v:=idea_codes_test.rpc('cancel',a,'{"company":1}');if not v ? 'error' then raise exception 'cancelled after close';end if;

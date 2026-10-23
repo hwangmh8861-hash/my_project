@@ -6,7 +6,7 @@ begin
  insert into idea_codes_test.teams(id,name) select g,'회사'||g from generate_series(1,7) g;
  insert into idea_codes_test.admin_sessions values(a,now()+interval '1 hour');
  select epoch::text into ep from idea_codes_test.room;select entry_code into code1 from idea_codes_test.teams where id=1;
- perform idea_codes_test.rpc('claim',d,jsonb_build_object('epoch',ep,'entryCode',code1));perform idea_codes_test.rpc('start',a);
+ perform idea_codes_test.rpc('claim',d,jsonb_build_object('epoch',ep,'representativeName','테스트 대표','entryCode',code1));perform idea_codes_test.rpc('start',a);
  perform idea_codes_test.rpc('submit',d,jsonb_build_object('epoch',ep,'confirmed',true,'items','[{"to":7,"amount":5000,"reason":"좋아요"}]'::jsonb));
  payload:='{"names":["회사1","회사2","회사3","회사4","회사5","회사6"],"budget":5000,"minutes":0}'::jsonb;
  v:=idea_codes_test.rpc('settings',a,payload);
