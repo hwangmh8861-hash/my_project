@@ -126,3 +126,5 @@ npm test 32개·npm run build 통과. 새 스키마와 누적 migration 경로�
 실제 아이폰 Safari·갤럭시 Chrome·카카오 인앱, 가상 키보드, 학교망/LTE 다기기 동시 제출은 이번 작업에서 검증하지 못했습니다. 375/390px 확인은 데스크톱 Chromium 안의 실제 너비 iframe이며 모바일 OS 에뮬레이션은 아닙니다. 실명 입력은 신원 인증을 제공하지 않아 코드 선점·이름 도용은 강사 확인과 연결 해제로 대응해야 합니다. 실제 서버 동시 도착의 승자는 기존 room FOR UPDATE 직렬화가 결정하며 한 회사의 소유권 변경은 원자적으로 처리됩니다.
 
 새 migration: 20261023053000_representative_lock_and_presentation.sql. 운영 적용은 README 순서를 따릅니다. 테스트에서 pgcrypto는 테스트용 대체 함수이므로 암호학 강도를 검증한 것은 아닙니다. tests/live.mjs는 실행하지 않았습니다. 미리보기는 브라우저 로컬 모의 서버이며 운영 Supabase에 연결하지 않습니다.
+
+미리보기 공개 결과: 기존 소유자 전용 주소 https://idea-market-review-minha.bushyshell2053.chatgpt.site 를 갱신했습니다. Sites 원본 커밋 03c273ddcd55d9f0fbe9f1c6fef1050fe59bf49f, 배포 appgdep_6adae90ef9a881918b486eb2f894738c 상태 succeeded. GitHub 검토 PR #3, 기능 커밋 59de06da213f72f86412154129c7ac6ee240aa12의 Vercel 빌드 상태 success. 업로드 후 app.js·schema.sql·새 migration·product.css·package-lock.json을 GitHub에서 다시 읽어 로컬 내용 전체와 일치함을 확인했습니다. main 병합과 운영 migration은 수행하지 않았습니다.
