@@ -1,0 +1,448 @@
+/* 강사 흐름 개선: 단계 진행 표시, 할 일 옆 버튼, 현황판 미리보기, 진행 중 제출 현황판 */
+
+/* 왼쪽 단계: 지난 단계는 체크, 지금 단계는 표시 */
+.adminsidebar .admintabs button[data-state="done"]:before {
+  content: "✓";
+  background: #eaf6ef;
+  border-color: #cfe8da;
+  color: #2f8a5c;
+}
+.adminsidebar .admintabs button[data-state="current"]:after {
+  content: "";
+  margin-left: auto;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #2864ed;
+  box-shadow: 0 0 0 4px #2864ed22;
+}
+.adminsidebar .admintabs button {
+  display: flex;
+  align-items: center;
+}
+.admin-title {
+  margin-bottom: 22px !important;
+}
+
+/* 체크리스트형 단계 카드 */
+.checksteps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+.checksteps li {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  border: 1px solid #e6ecf4;
+  border-radius: 14px;
+  background: #fbfcfe;
+}
+.checksteps li > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.checksteps strong {
+  font-size: 15px;
+  color: #1f3550;
+}
+.checksteps small {
+  font-size: 13px;
+  color: #74859b;
+}
+.checksteps .lsmark {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 2px solid #d3dcea;
+  background: #fff;
+  display: grid;
+  place-items: center;
+  font-size: 13px;
+  font-weight: 800;
+  color: #fff;
+}
+.checksteps li.done .lsmark {
+  background: #39a47b;
+  border-color: #39a47b;
+}
+.checksteps li.done .lsmark:before {
+  content: "✓";
+}
+.checksteps li.done small {
+  color: #328264;
+}
+.checksteps li.current {
+  border-color: #b9cdfa;
+  background: #f4f7ff;
+}
+.checksteps li.current .lsmark {
+  border-color: #2864ed;
+  box-shadow: inset 0 0 0 4px #fff;
+  background: #2864ed;
+}
+.checksteps li > button,
+.checksteps li > a.button {
+  min-height: 44px;
+  padding: 0 16px;
+  font-size: 14px;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.checksteps [aria-pressed="true"] {
+  background: #edf4ff;
+  border-color: #a9c6fb;
+  color: #2868d8;
+}
+.admin #panel-prepare > .card.launchcard {
+  display: block;
+  padding: 25px;
+}
+.admin #panel-prepare > .card.launchcard h2 {
+  margin: 0 0 16px;
+}
+@media (min-width: 1500px) {
+  .admin #panel-prepare > .launchcard {
+    grid-column: 1 / -1;
+  }
+}
+
+/* 진행 탭: 현황판 전환과 접속 전 조의 코드 */
+.livehead {
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 6px;
+}
+.livehead h2 {
+  margin-bottom: 0 !important;
+}
+.segmented {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: #f1f4f9;
+  border-radius: 12px;
+  padding: 4px;
+}
+.segmented > span {
+  font-size: 12px;
+  color: #7a8aa0;
+  padding: 0 8px 0 6px;
+}
+.segmented button {
+  min-height: 38px;
+  padding: 0 14px;
+  font-size: 13px;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.segmented button[aria-pressed="true"] {
+  background: #fff;
+  color: #2558c4;
+  box-shadow: 0 1px 4px #1f3a6618;
+}
+.admin .teamline {
+  display: flex;
+}
+.admin .teamline > strong {
+  flex: 1;
+  min-width: 0;
+}
+.linecode {
+  font-size: 13px;
+  color: #7a8aa0;
+  white-space: nowrap;
+}
+.linecode b {
+  font-size: 17px;
+  color: #2864ed;
+  letter-spacing: 1px;
+  margin-left: 4px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 회고 탭: 회사 선택 */
+.reflectsteps {
+  margin-bottom: 18px;
+}
+.focuschips {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.focuschips button {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  min-height: 62px;
+  padding: 10px 14px;
+  text-align: left;
+}
+.focuschips button span {
+  font-size: 15px;
+  overflow-wrap: anywhere;
+}
+.focuschips button b {
+  font-size: 12px;
+  color: #7a8aa0;
+  font-weight: 600;
+}
+.focuschips button[aria-pressed="true"] {
+  background: #edf4ff;
+  border-color: #7fa6f6;
+  color: #2558c4;
+}
+.focuschips button[aria-pressed="true"] b {
+  color: #2864ed;
+}
+.troublecard {
+  background: #fafbfc;
+}
+.troublecard h2 {
+  font-size: 15px !important;
+  color: #6a7b91;
+}
+.troublecard .reopen {
+  border-top: 0;
+  margin-top: 0;
+  padding-top: 0;
+}
+
+/* 오른쪽: 현황판 미리보기 */
+.boardpreview {
+  background: #fff;
+  border: 1px solid #e4eaf2;
+  border-radius: 18px;
+  padding: 16px;
+}
+.pvhead {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 650;
+  color: #52667e;
+  margin-bottom: 12px;
+}
+.pvscreen {
+  aspect-ratio: 16 / 10;
+  background: #f3f6fb;
+  border: 1px solid #e3e9f2;
+  border-radius: 12px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow: hidden;
+}
+.pvtitle {
+  font-size: 13px;
+  font-weight: 750;
+  color: #1f3550;
+  text-align: center;
+}
+.pvqr {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 0;
+}
+.pvqr canvas {
+  width: 92px !important;
+  height: 92px !important;
+  border-radius: 6px;
+  background: #fff;
+}
+.pvqr span,
+.pvnote {
+  font-size: 12px;
+  color: #74859b;
+  margin: 0;
+  text-align: center;
+}
+.pvstatus {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px 8px;
+  flex: 1;
+  align-content: start;
+  overflow: hidden;
+}
+.pvstatus li {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  color: #52667e;
+  min-width: 0;
+}
+.pvstatus li span {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pvstatus li small {
+  font-size: 10px;
+  color: #98a6b8;
+}
+.pvstatus i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #c7d0dd;
+  flex-shrink: 0;
+}
+.pvstatus .working i {
+  background: #f0a43a;
+}
+.pvstatus .submitted i {
+  background: #39a47b;
+}
+.pvstatus .submitted small {
+  color: #328264;
+}
+.pvbig {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  font-size: 12px;
+  color: #74859b;
+}
+.pvbig b {
+  font-size: 28px;
+  color: #2864ed;
+}
+.pvrank {
+  margin: 0;
+  padding: 0 0 0 20px;
+  display: grid;
+  gap: 6px;
+  font-size: 13px;
+  align-content: center;
+  flex: 1;
+}
+.pvrank li span {
+  font-weight: 650;
+  color: #1f3550;
+}
+.pvrank li b {
+  float: right;
+  color: #2864ed;
+  font-size: 12px;
+}
+.pvfocus {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  text-align: center;
+}
+.pvfocus strong {
+  font-size: 16px;
+  color: #1f3550;
+}
+.pvfocus span {
+  font-size: 12px;
+  color: #74859b;
+}
+
+/* 현황판: 투자 진행 중에는 순위 대신 제출 현황 */
+.board #statusgrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 14px;
+}
+.board .statustile {
+  border: 1px solid #e3e9f2;
+  border-radius: 18px;
+  padding: 18px 20px;
+  background: #f7f9fc;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.board .statustile strong {
+  font-size: 27px;
+  line-height: 1.35;
+  font-weight: 750;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+.board .statustile span {
+  font-size: 24px;
+  color: #8a99ad;
+}
+.board .statustile.working {
+  border-color: #f6d8a8;
+  background: #fffaf1;
+}
+.board .statustile.working span {
+  color: #b9771c;
+}
+.board .statustile.submitted {
+  border-color: #bfe3cf;
+  background: #f0faf4;
+}
+.board .statustile.submitted span {
+  color: #2f8a5c;
+  font-weight: 700;
+}
+.board .statusnote {
+  font-size: 24px;
+  color: #8a99ad;
+  margin: 22px 0 0;
+}
+
+/* 현황판 결과: 한 화면에 더 많은 회사가 들어가도록 줄 높이 축소 */
+.board .winner + .boardgrid #chart {
+  gap: 10px;
+}
+.board .winner + .boardgrid .chartrow {
+  min-height: 52px;
+  gap: 4px 20px;
+}
+.board .winner + .boardgrid .chartsummary {
+  margin-bottom: 14px;
+  padding-bottom: 12px;
+}
+
+@media (max-width: 600px) {
+  .checksteps li {
+    grid-template-columns: 28px minmax(0, 1fr);
+  }
+  .checksteps li > button,
+  .checksteps li > a.button {
+    grid-column: 2;
+    justify-self: start;
+  }
+  .livehead {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
