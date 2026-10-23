@@ -1,0 +1,5 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {createHandler} from '../supabase/edge-handler.js';
+test('P0 login identity is device-scoped; forwarded IP headers cannot change it',async()=>{let calls=[];const handler=createHandler(async p=>{calls.push(p);return {data:{token:'test-session'}}});for(const ip of ['same-school-ip','forged, spoof'])await handler(new Request('https://example.test',{method:'POST',headers:{'x-forwarded-for':ip,'x-real-ip':'spoof'},body:JSON.stringify({action:'login',token:'a'.repeat(64),data:{pin:'1234'}})}));assert.equal(calls[0].p_token,calls[1].p_token);assert.equal(calls[0].p_token.length,64);assert.equal(calls[0].p_ip,'');assert(!JSON.stringify(calls).includes('school'));});
+test('P0 retry delay returned as bounded server response and Retry-After',async()=>{const handler=createHandler(async()=>({data:{error:'잠시 후 다시 시도해 주세요.',code:'LOGIN_WAIT',retryAfter:30}}));const res=await handler(new Request('https://example.test',{method:'POST',body:JSON.stringify({action:'login',token:'a'.repeat(64),data:{pin:'0000'}})}));assert.equal(res.status,429);assert.equal(res.headers.get('Retry-After'),'30');});

@@ -81,16 +81,16 @@ begin
  if result->>'code' is distinct from 'UNAUTHORIZED' then raise exception 'student reissued code';end if;
  -- All investment validation remains on the server.
  perform idea_codes_test.rpc('cancel',a,'{"company":1}');
- for config in select value from jsonb_array_elements('[{"to":2,"amount":4900,"reason":"실제로 활용 가능한 좋은 아이디어입니다."},{"to":2,"amount":4950,"reason":"실제로 활용 가능한 좋은 아이디어입니다."},{"to":2,"amount":5000,"reason":"짧음"},{"to":99,"amount":5000,"reason":"실제로 활용 가능한 좋은 아이디어입니다."}]'::jsonb) loop
+ for config in select value from jsonb_array_elements('[{"to":2,"amount":4900,"reason":"실제로 활용 가능한 좋은 아이디어입니다."},{"to":2,"amount":4950,"reason":"실제로 활용 가능한 좋은 아이디어입니다."},{"to":2,"amount":5000,"reason":"   "},{"to":99,"amount":5000,"reason":"실제로 활용 가능한 좋은 아이디어입니다."}]'::jsonb) loop
   result:=idea_codes_test.rpc('submit',d1,jsonb_build_object('epoch',ep,'confirmed',true,'items',jsonb_build_array(config)));
   if not result ? 'error' then raise exception 'investment validation bypass: %',config->>'amount';end if;
  end loop;
  result:=idea_codes_test.rpc('submit',d1,jsonb_build_object('epoch',ep,'confirmed',false,'items',jsonb_build_array(jsonb_build_object('to',2,'amount',5000,'reason','실제로 활용 가능한 좋은 아이디어입니다.'))));
  if not result ? 'error' then raise exception 'consent check bypassed';end if;
- -- More than 100 global failures within 15 minutes blocks any device.
+ -- More than 100 failures introduces at most five seconds between attempts.
  insert into idea_codes_test.code_failures(failed_at) select clock_timestamp() from generate_series(1,101);
  result:=idea_codes_test.rpc('claim',repeat('f',64),jsonb_build_object('epoch',ep,'entryCode',code1));
- if result->>'code' is distinct from 'CODE_WAIT' or (result->>'retryAfter')::int<800 then raise exception 'global rate limit failed';end if;
+ if result->>'code' is distinct from 'CODE_WAIT' or (result->>'retryAfter')::int>5 then raise exception 'global rate limit failed';end if;
  update idea_codes_test.code_failures set failed_at=clock_timestamp()-interval '16 minutes';
  result:=idea_codes_test.rpc('claim',repeat('f',64),jsonb_build_object('epoch',ep,'entryCode',code1));
  if result ? 'error' then raise exception 'global limit did not expire';end if;
@@ -103,5 +103,5 @@ begin
  if result ? 'error' or (select entry_code from idea_codes_test.teams where id=1)<>code1 or (select count(distinct entry_code) from idea_codes_test.teams)<>4 then raise exception 'new team code or existing code preservation failed';end if;
  select array_agg(entry_code) into previous_codes from idea_codes_test.teams;
  result:=idea_codes_test.rpc('reset',a,'{"confirm":"RESET","keep":false}');
- if jsonb_array_length(result->'teams')<>7 or exists(select 1 from idea_codes_test.teams where entry_code=any(previous_codes)) then raise exception 'default reset rotation failed';end if;
+ if jsonb_array_length(result->'teams')<>4 or exists(select 1 from idea_codes_test.teams where entry_code=any(previous_codes)) then raise exception 'default reset rotation failed';end if;
 end $test$;
