@@ -1,7 +1,7 @@
 -- Representative ownership, admin-only identity and projector controls. Existing investments are preserved.
-alter table idea_private.teams add column representative_name text check(representative_name is null or (length(btrim(representative_name)) between 1 and 30));
-alter table idea_private.teams add column joined_at timestamptz;
-alter table idea_private.room add column presentation jsonb not null default '{"page":0,"auto":true,"at":null,"version":0}'::jsonb;
+alter table idea_private.teams add column if not exists representative_name text check(representative_name is null or (length(btrim(representative_name)) between 1 and 30));
+alter table idea_private.teams add column if not exists joined_at timestamptz;
+alter table idea_private.room add column if not exists presentation jsonb not null default '{"page":0,"auto":true,"at":null,"version":0}'::jsonb;
 create or replace function public.idea_market_rpc(p_action text,p_token text default '',p_data jsonb default '{}'::jsonb,p_ip text default '') returns jsonb language plpgsql security invoker set search_path='' as $$
 declare r idea_private.room%rowtype; t idea_private.teams%rowtype; v jsonb; n int; amt int; total bigint:=0; ids int[]:='{}'; admin boolean:=false; board boolean:=false; changed boolean:=false; tok text; count_attempt int; recent timestamptz; out_json jsonb; mine jsonb; list jsonb; entries jsonb; names jsonb; code_state idea_private.code_attempts%rowtype; failure_count int; retry_at timestamptz; old_codes text[]; login_state idea_private.login_attempts%rowtype; delay_seconds int; stamp timestamptz;
 begin

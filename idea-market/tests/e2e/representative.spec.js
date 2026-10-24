@@ -1,11 +1,15 @@
 import {test,expect} from '@playwright/test';
 import {createHash} from 'node:crypto';
-import {makeDatabase,schemaSource} from '../sql-harness.js';
+import {makeDatabase,schemaSource,isolated} from '../sql-harness.js';
+import fs from 'node:fs';
+const sql=path=>fs.readFileSync(new URL(path,import.meta.url),'utf8');
+const entryFile=fs.readdirSync(new URL('../../supabase/migrations/',import.meta.url)).find(f=>f.endsWith('_representative_entry_guard.sql'));
+const operatingRpc=isolated(sql('../fixtures/pre-spare-production-rpc.sql')+';\n'+sql('../../supabase/migrations/20261023124013_spare_instructor_access.sql')+'\n'+sql('../../supabase/migrations/'+entryFile));
 import {createHandler} from '../../supabase/edge-handler.js';
 let db,handler,contexts,errors;
 test.beforeEach(async()=>{
  db=await makeDatabase();contexts=[];errors=[];
- await db.exec('begin;'+schemaSource()+`insert into idea_codes_test.room(pin_hash) values(extensions.crypt('1234','test'));insert into idea_codes_test.teams(id,name,entry_code) select g,g||'조 회사',idea_codes_test.default_entry_code(g) from generate_series(1,8) g;set local role service_role;`);
+ await db.exec('begin;'+schemaSource()+operatingRpc+`insert into idea_codes_test.room(pin_hash) values(extensions.crypt('1234','test'));insert into idea_codes_test.teams(id,name,entry_code) select g,g||'조 회사',idea_codes_test.default_entry_code(g) from generate_series(1,8) g;set local role service_role;`);
  handler=createHandler(async p=>{const r=await db.query('select idea_codes_test.rpc($1,$2,$3::jsonb,$4) as result',[p.p_action,p.p_token,JSON.stringify(p.p_data),p.p_ip]);return {data:r.rows[0].result}});
 });
 test.afterEach(async()=>{for(const c of contexts)await c.close();await db.exec('rollback');expect((await db.query("select to_regnamespace('idea_codes_test') as ns")).rows[0].ns).toBeNull();await db.close();expect(errors).toEqual([])});
