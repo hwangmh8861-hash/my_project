@@ -21,18 +21,21 @@ begin
  if result->>'code' is distinct from 'INVALID_CODE' then raise exception 'legacy company claim allowed';end if;
  -- Five wrong attempts lock this device for one minute, even with the correct code.
  for failures in 1..5 loop
-  result:=idea_codes_test.rpc('claim',d1,jsonb_build_object('epoch',ep,'entryCode',wrong));
+  result:=idea_codes_test.rpc('claim',d1,jsonb_build_object('epoch',ep,'representativeName','테스트 대표','entryCode',wrong));
  end loop;
  if result->>'code' is distinct from 'CODE_WAIT' or (result->>'retryAfter')::int is distinct from 60 then raise exception 'fifth failure did not lock';end if;
- result:=idea_codes_test.rpc('claim',d1,jsonb_build_object('epoch',ep,'entryCode',code1));
+ result:=idea_codes_test.rpc('claim',d1,jsonb_build_object('epoch',ep,'representativeName','테스트 대표','entryCode',code1));
  if result->>'code' is distinct from 'CODE_WAIT' then raise exception 'correct code bypassed device lock';end if;
  -- Simulate elapsed wait in test-only data.
  update idea_codes_test.code_attempts set blocked_until=clock_timestamp()-interval '1 second' where device_hash=d1;
- result:=idea_codes_test.rpc('claim',d1,jsonb_build_object('epoch',ep,'entryCode',code1));
+ result:=idea_codes_test.rpc('claim',d1,jsonb_build_object('epoch',ep,'representativeName','테스트 대표','entryCode',code1));
  if (result->'mine'->>'id')::int is distinct from 1 then raise exception 'entry after wait failed';end if;
  if result ? 'entryCodes' or result ? 'investments' or result->'teams'->0 ? 'entry_code' then raise exception 'student secrets/results leaked';end if;
- result:=idea_codes_test.rpc('claim',d2,jsonb_build_object('epoch',ep,'entryCode',code1));
- if (result->'mine'->>'id')::int is distinct from 1 then raise exception 'device takeover failed';end if;
+ result:=idea_codes_test.rpc('claim',d2,jsonb_build_object('epoch',ep,'representativeName','테스트 대표','entryCode',code1));
+ if result->>'code' is distinct from 'TEAM_IN_USE' then raise exception 'second device stole connected company';end if;
+ perform idea_codes_test.rpc('release',a,'{"company":1}');
+ result:=idea_codes_test.rpc('claim',d2,jsonb_build_object('epoch',ep,'representativeName','새 대표','entryCode',code1));
+ if result ? 'error' then raise exception 'released company could not reconnect';end if;
  result:=idea_codes_test.rpc('student',d1);
  if result->'mine' is distinct from 'null'::jsonb or jsonb_array_length(result->'teams')<>0 then raise exception 'old device still connected';end if;
  result:=idea_codes_test.rpc('working',d1,jsonb_build_object('epoch',ep));
@@ -55,7 +58,8 @@ begin
  result:=idea_codes_test.rpc('start',a);
  if not result ? 'error' then raise exception 'double start allowed';end if;
 
- result:=idea_codes_test.rpc('claim',d3,jsonb_build_object('epoch',ep,'entryCode',code1));
+ perform idea_codes_test.rpc('release',a,'{"company":1}');
+ result:=idea_codes_test.rpc('claim',d3,jsonb_build_object('epoch',ep,'representativeName','테스트 대표','entryCode',code1));
  if (result->'mine'->>'submitted')::boolean is distinct from true then raise exception 'submitted state lost during takeover';end if;
  result:=idea_codes_test.rpc('submit',d3,jsonb_build_object('epoch',ep,'confirmed',true,'items',jsonb_build_array(jsonb_build_object('to',2,'amount',5000,'reason','실제로 활용 가능한 좋은 아이디어입니다.'))));
  if result->>'code' is distinct from 'SUBMITTED' then raise exception 'duplicate submission allowed';end if;
@@ -64,11 +68,11 @@ begin
  result:=idea_codes_test.rpc('reissue',a,'{"company":1}');
  select entry_code into code1 from idea_codes_test.teams where id=1;
  if code1=old_code then raise exception 'reissue reused old code';end if;
- result:=idea_codes_test.rpc('claim',d1,jsonb_build_object('epoch',ep,'entryCode',old_code));
+ result:=idea_codes_test.rpc('claim',d1,jsonb_build_object('epoch',ep,'representativeName','테스트 대표','entryCode',old_code));
  if result->>'code' is distinct from 'INVALID_CODE' then raise exception 'revoked code accepted';end if;
  result:=idea_codes_test.rpc('student',d3);
  if result->'mine' is distinct from 'null'::jsonb then raise exception 'reissue did not revoke old device';end if;
- result:=idea_codes_test.rpc('claim',d1,jsonb_build_object('epoch',ep,'entryCode',code1));
+ result:=idea_codes_test.rpc('claim',d1,jsonb_build_object('epoch',ep,'representativeName','테스트 대표','entryCode',code1));
  if (result->'mine'->>'submitted')::boolean is distinct from true then raise exception 'reissue lost submission';end if;
  -- Board and students never receive code fields, even admin using board action.
  result:=idea_codes_test.rpc('board',board);
@@ -89,10 +93,11 @@ begin
  if not result ? 'error' then raise exception 'consent check bypassed';end if;
  -- More than 100 failures introduces at most five seconds between attempts.
  insert into idea_codes_test.code_failures(failed_at) select clock_timestamp() from generate_series(1,101);
- result:=idea_codes_test.rpc('claim',repeat('f',64),jsonb_build_object('epoch',ep,'entryCode',code1));
+ result:=idea_codes_test.rpc('claim',repeat('f',64),jsonb_build_object('epoch',ep,'representativeName','테스트 대표','entryCode',code1));
  if result->>'code' is distinct from 'CODE_WAIT' or (result->>'retryAfter')::int>5 then raise exception 'global rate limit failed';end if;
  update idea_codes_test.code_failures set failed_at=clock_timestamp()-interval '16 minutes';
- result:=idea_codes_test.rpc('claim',repeat('f',64),jsonb_build_object('epoch',ep,'entryCode',code1));
+ perform idea_codes_test.rpc('release',a,'{"company":1}');
+ result:=idea_codes_test.rpc('claim',repeat('f',64),jsonb_build_object('epoch',ep,'representativeName','테스트 대표','entryCode',code1));
  if result ? 'error' then raise exception 'global limit did not expire';end if;
  -- Reset rotates codes; settings preserve existing codes and generate new teams.
  select array_agg(entry_code) into previous_codes from idea_codes_test.teams;

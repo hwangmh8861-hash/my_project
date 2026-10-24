@@ -29,13 +29,13 @@ begin
  -- A global code attack imposes a bounded per-device interval, never a shared gate.
  insert into idea_codes_test.code_failures select clock_timestamp() from generate_series(1,101);
  select entry_code into code1 from idea_codes_test.teams where id=1;
- v:=idea_codes_test.rpc('claim',student,jsonb_build_object('epoch',ep,'entryCode',code1));
+ v:=idea_codes_test.rpc('claim',student,jsonb_build_object('epoch',ep,'representativeName','테스트 대표','entryCode',code1));
  if v->>'code' is distinct from 'CODE_WAIT' or (v->>'retryAfter')::int>5 then raise exception 'P0-2 global code block unbounded';end if;
  select next_at into deadline_before from idea_codes_test.code_attempts where device_hash=student;
- perform idea_codes_test.rpc('claim',student,jsonb_build_object('epoch',ep,'entryCode',code1));
+ perform idea_codes_test.rpc('claim',student,jsonb_build_object('epoch',ep,'representativeName','테스트 대표','entryCode',code1));
  if (select next_at from idea_codes_test.code_attempts where device_hash=student)<>deadline_before then raise exception 'P0-2 deadline sliding';end if;
  update idea_codes_test.code_attempts set next_at=clock_timestamp()-interval '1 second' where device_hash=student;
- v:=idea_codes_test.rpc('claim',student,jsonb_build_object('epoch',ep,'entryCode',code1));
+ v:=idea_codes_test.rpc('claim',student,jsonb_build_object('epoch',ep,'representativeName','테스트 대표','entryCode',code1));
  if v ? 'error' or v->'mine'->>'id'<>'1' then raise exception 'P0-2 normal code blocked while global failures remain';end if;
  v:=idea_codes_test.rpc('admin',a);if not (v->>'entryLimited')::boolean then raise exception 'P0-2 warning missing';end if;
  v:=idea_codes_test.rpc('clear_entry_limits',student);if v->>'code'<>'UNAUTHORIZED' then raise exception 'student cleared limits';end if;

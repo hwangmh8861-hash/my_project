@@ -7,7 +7,7 @@ begin
  insert into idea_codes_test.admin_sessions values(a,now()+interval '1 hour');
  select epoch::text into ep from idea_codes_test.room;
  select entry_code into code1 from idea_codes_test.teams where id=1;
- perform idea_codes_test.rpc('claim',d,jsonb_build_object('epoch',ep,'entryCode',code1));
+ perform idea_codes_test.rpc('claim',d,jsonb_build_object('epoch',ep,'representativeName','테스트 대표','entryCode',code1));
  perform idea_codes_test.rpc('start',a);
  foreach reason_value in array array['','   ',E'\n\t \r'] loop
  result:=idea_codes_test.rpc('submit',d,jsonb_build_object('epoch',ep,'confirmed',true,'items',jsonb_build_array(jsonb_build_object('to',2,'amount',5000,'reason',reason_value))));
